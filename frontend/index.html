@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Engram — Decision Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,600;1,9..144,400&display=swap" rel="stylesheet"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#faf7f2;--bg2:#f4f0e8;--bg3:#ede8dc;--bg4:#e5dfd0;
+      --border:rgba(180,160,120,0.2);--border2:rgba(180,160,120,0.4);
+      --text:#2c2416;--text2:#5c4f38;--muted:#9c8c72;--muted2:#b8a890;
+      --orange:#e8650a;--orange2:#f07830;--orange-dim:rgba(232,101,10,0.08);
+      --amber:#c47a15;--amber-dim:rgba(196,122,21,0.1);
+      --green:#2d7a4f;--green-dim:rgba(45,122,79,0.1);
+      --red:#c0392b;--red-dim:rgba(192,57,43,0.08);
+      --mono:'DM Mono',monospace;--serif:'Fraunces',serif;
+    }
+    html,body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;min-height:100vh;line-height:1.6}
+    body::before{content:'';position:fixed;inset:0;background-image:radial-gradient(ellipse at 20% 50%,rgba(232,101,10,0.03) 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(196,122,21,0.04) 0%,transparent 50%);pointer-events:none;z-index:0}
+    .app{display:flex;height:100vh;overflow:hidden;position:relative;z-index:1}
+    .sidebar{width:230px;flex-shrink:0;border-right:1px solid var(--border2);display:flex;flex-direction:column;background:var(--bg2)}
+    .logo-block{padding:24px 20px 20px;border-bottom:1px solid var(--border)}
+    .logo-name{font-family:var(--serif);font-size:26px;color:var(--orange);font-weight:600;letter-spacing:-0.03em;line-height:1}
+    .logo-sub{font-size:9px;color:var(--muted);letter-spacing:0.15em;text-transform:uppercase;margin-top:4px}
+    .nav{padding:14px 10px;flex:1}
+    .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:6px;cursor:pointer;color:var(--muted);font-size:11px;letter-spacing:0.04em;transition:all 0.15s;margin-bottom:3px;border:1px solid transparent}
+    .nav-item:hover{color:var(--text2);background:var(--bg3)}
+    .nav-item.active{color:var(--orange);background:var(--orange-dim);border-color:rgba(232,101,10,0.2);font-weight:500}
+    .nav-icon{width:16px;height:16px;border-radius:3px;background:currentColor;opacity:0.25;flex-shrink:0}
+    .nav-item.active .nav-icon{opacity:0.6}
+    .stats-block{padding:16px 20px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px;background:var(--bg3)}
+    .stats-title{font-size:9px;color:var(--muted);letter-spacing:0.15em;text-transform:uppercase;margin-bottom:4px}
+    .stat-row{display:flex;justify-content:space-between;align-items:center}
+    .stat-label{font-size:10px;color:var(--muted)}
+    .stat-value{font-size:11px;color:var(--orange);font-weight:500}
+    .main{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+    .topbar{padding:14px 28px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg);position:sticky;top:0;z-index:10}
+    .topbar-title{font-family:var(--serif);font-size:16px;color:var(--text);font-weight:500;letter-spacing:-0.01em}
+    .topbar-status{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted)}
+    .status-dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
+    .content{padding:24px 28px;flex:1;max-width:900px}
+    .panel{background:var(--bg2);border:1px solid var(--border2);border-radius:10px;margin-bottom:16px;overflow:hidden;box-shadow:0 1px 3px rgba(100,70,20,0.06)}
+    .panel-header{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg3)}
+    .panel-title{font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);font-weight:500}
+    .panel-body{padding:18px}
+    textarea{width:100%;min-height:160px;background:var(--bg);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:12px;line-height:1.75;padding:14px 16px;resize:vertical;outline:none;transition:border-color 0.15s,box-shadow 0.15s}
+    textarea:focus{border-color:var(--orange);box-shadow:0 0 0 3px var(--orange-dim)}
+    textarea::placeholder{color:var(--muted2)}
+    .input-row{display:flex;gap:8px;margin-top:10px}
+    input[type="text"]{flex:1;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:12px;padding:9px 13px;outline:none;transition:border-color 0.15s,box-shadow 0.15s}
+    input[type="text"]:focus{border-color:var(--orange);box-shadow:0 0 0 3px var(--orange-dim)}
+    input[type="text"]::placeholder{color:var(--muted2)}
+    .btn{font-family:var(--mono);font-size:11px;letter-spacing:0.05em;border:none;border-radius:6px;padding:9px 18px;cursor:pointer;transition:all 0.15s;font-weight:500}
+    .btn-primary{background:var(--orange);color:#fff}
+    .btn-primary:hover{background:var(--orange2);box-shadow:0 2px 8px rgba(232,101,10,0.3)}
+    .btn-primary:disabled{opacity:0.4;cursor:not-allowed;box-shadow:none}
+    .btn-ghost{background:var(--bg);color:var(--text2);border:1px solid var(--border2)}
+    .btn-ghost:hover{border-color:var(--orange);color:var(--orange);background:var(--orange-dim)}
+    .tag{font-size:9px;letter-spacing:0.1em;text-transform:uppercase;padding:3px 8px;border-radius:4px;font-weight:500}
+    .tag-domain{background:var(--orange-dim);color:var(--orange);border:1px solid rgba(232,101,10,0.25)}
+    .tag-project{background:var(--amber-dim);color:var(--amber);border:1px solid rgba(196,122,21,0.25)}
+    .tag-score{background:var(--green-dim);color:var(--green);border:1px solid rgba(45,122,79,0.25)}
+    .tag-invalid{background:var(--red-dim);color:var(--red);border:1px solid rgba(192,57,43,0.2)}
+    .decision-card{border:1px solid var(--border2);border-radius:8px;padding:14px 16px;margin-bottom:10px;background:var(--bg);transition:all 0.15s;position:relative;overflow:hidden}
+    .decision-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--orange),var(--amber));opacity:var(--glow-opacity,0.5);border-radius:3px 0 0 3px}
+    .decision-card:hover{border-color:rgba(232,101,10,0.3);box-shadow:0 2px 8px rgba(100,70,20,0.08)}
+    .decision-summary{font-size:12px;color:var(--text);margin-bottom:8px;line-height:1.55;padding-left:8px}
+    .decision-meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding-left:8px}
+    .weight-bar{display:flex;align-items:center;gap:10px;margin-top:10px;padding-left:8px}
+    .weight-track{flex:1;height:3px;background:var(--bg3);border-radius:2px;overflow:hidden}
+    .weight-fill{height:100%;background:linear-gradient(90deg,var(--orange),var(--amber));border-radius:2px;transition:width 0.6s ease}
+    .weight-label{font-size:9px;color:var(--muted);width:32px;text-align:right;flex-shrink:0}
+    .cf-card{border:1px solid rgba(196,122,21,0.25);background:linear-gradient(135deg,var(--amber-dim),rgba(232,101,10,0.04));border-radius:8px;padding:14px 16px;margin-bottom:10px}
+    .cf-header{display:flex;align-items:flex-start;gap:8px;margin-bottom:6px}
+    .cf-icon{color:var(--amber);font-size:14px;flex-shrink:0;margin-top:1px}
+    .cf-option{font-size:12px;color:var(--text);font-weight:500;line-height:1.4}
+    .cf-reason{font-size:11px;color:var(--text2);line-height:1.6;margin-bottom:6px;padding-left:22px}
+    .cf-meta{font-size:9px;color:var(--muted);letter-spacing:0.05em;padding-left:22px}
+    .status-bar{display:none;align-items:center;gap:10px;padding:11px 16px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;margin-bottom:14px;font-size:11px;color:var(--text2)}
+    .status-bar.visible{display:flex}
+    .spinner{width:13px;height:13px;border:2px solid var(--bg3);border-top-color:var(--orange);border-radius:50%;animation:spin 0.7s linear infinite;flex-shrink:0}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .briefing-text{padding:16px 18px;font-size:12px;line-height:1.8;color:var(--text2);white-space:pre-wrap}
+    .btn-copy{font-family:var(--mono);font-size:10px;color:var(--orange);background:transparent;border:1px solid rgba(232,101,10,0.25);border-radius:4px;padding:4px 12px;cursor:pointer;transition:all 0.15s}
+    .btn-copy:hover{background:var(--orange-dim)}
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .empty{padding:32px;text-align:center;color:var(--muted2);font-size:11px;letter-spacing:0.04em}
+    .view{display:none}
+    .view.active{display:block}
+    #ingest-result,#context-result{display:none}
+    #ingest-result.visible,#context-result.visible{display:block}
+    .filter-pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+    .pill{font-family:var(--mono);font-size:10px;padding:5px 12px;border-radius:20px;border:1px solid var(--border2);background:var(--bg);color:var(--muted);cursor:pointer;transition:all 0.15s;letter-spacing:0.04em}
+    .pill:hover,.pill.active{border-color:var(--orange);color:var(--orange);background:var(--orange-dim);font-weight:500}
+    @media(max-width:768px){.sidebar{display:none}.two-col{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo-block">
+      <div class="logo-name">Engram</div>
+      <div class="logo-sub">Decision Intelligence</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-item active" onclick="switchView('ingest',this)">
+        <div class="nav-icon" style="border-radius:2px"></div>Ingest Session
+      </div>
+      <div class="nav-item" onclick="switchView('context',this)">
+        <div class="nav-icon" style="border-radius:50%"></div>Retrieve Context
+      </div>
+      <div class="nav-item" onclick="switchView('graph',this);loadDecisions('')">
+        <div class="nav-icon" style="transform:rotate(45deg)"></div>Decision Graph
+      </div>
+    </nav>
+    <div class="stats-block">
+      <div class="stats-title">Knowledge Graph</div>
+      <div class="stat-row"><span class="stat-label">Active decisions</span><span class="stat-value" id="stat-decisions">—</span></div>
+      <div class="stat-row"><span class="stat-label">Counterfactuals</span><span class="stat-value" id="stat-cfs">—</span></div>
+      <div class="stat-row"><span class="stat-label">Sessions</span><span class="stat-value" id="stat-sessions">—</span></div>
+      <div class="stat-row"><span class="stat-label">Avg weight</span><span class="stat-value" id="stat-weight">—</span></div>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <span class="topbar-title" id="view-title">Ingest Session</span>
+      <div class="topbar-status"><div class="status-dot"></div><span>neo4j connected</span></div>
+    </div>
+    <div class="content">
+
+      <!-- Ingest -->
+      <div class="view active" id="view-ingest">
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Session Content</span></div>
+          <div class="panel-body">
+            <textarea id="ingest-content" placeholder="Paste an AI conversation here — Claude, ChatGPT, Gemini, Cursor, or any tool.&#10;&#10;Engram extracts atomic decisions, rejected alternatives, and their reasoning into your knowledge graph automatically."></textarea>
+            <div class="input-row">
+              <input type="text" id="ingest-project" placeholder="project-id (optional)"/>
+              <input type="text" id="ingest-tool" placeholder="tool: claude / chatgpt / gemini"/>
+              <button class="btn btn-primary" onclick="runIngest()" id="btn-ingest">Ingest →</button>
+            </div>
+          </div>
+        </div>
+        <div class="status-bar" id="ingest-status"><div class="spinner"></div><span>running extraction pipeline…</span></div>
+        <div id="ingest-result">
+          <div class="two-col" style="margin-bottom:14px">
+            <div class="panel">
+              <div class="panel-header"><span class="panel-title">Extraction Summary</span></div>
+              <div class="panel-body">
+                <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+                  <span class="tag tag-domain" id="r-domain">—</span>
+                  <span class="tag tag-score" id="r-score">—</span>
+                </div>
+                <div style="font-size:12px;color:var(--text2);line-height:1.65" id="r-summary">—</div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-header"><span class="panel-title">Graph Writes</span></div>
+              <div class="panel-body">
+                <div class="stat-row" style="margin-bottom:10px"><span class="stat-label">Decisions saved</span><span class="stat-value" id="r-decisions">—</span></div>
+                <div class="stat-row" style="margin-bottom:10px"><span class="stat-label">Counterfactuals saved</span><span class="stat-value" id="r-cfs">—</span></div>
+                <div class="stat-row" style="margin-bottom:10px"><span class="stat-label">Critique score</span><span class="stat-value" id="r-critique">—</span></div>
+                <div style="font-size:9px;color:var(--muted);margin-top:4px;word-break:break-all" id="r-session"></div>
+              </div>
+            </div>
+          </div>
+          <div id="r-error-block" style="display:none" class="panel">
+            <div class="panel-body" style="color:var(--red);font-size:12px" id="r-error"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Context -->
+      <div class="view" id="view-context">
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Retrieval Query</span></div>
+          <div class="panel-body">
+            <input type="text" id="ctx-query" style="width:100%;margin-bottom:10px" placeholder="What are you about to decide? e.g. choosing a database for high-throughput writes"/>
+            <div class="input-row">
+              <input type="text" id="ctx-domain" placeholder="domain: database / architecture / auth…"/>
+              <input type="text" id="ctx-concerns" placeholder="concerns: cost, scalability, vendor_lock_in…"/>
+              <button class="btn btn-primary" onclick="runContext()" id="btn-ctx">Retrieve →</button>
+            </div>
+          </div>
+        </div>
+        <div class="status-bar" id="ctx-status"><div class="spinner"></div><span>running 4-level causal retrieval…</span></div>
+        <div id="context-result">
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">⚠ Counterfactual Warnings</span>
+              <span style="font-size:10px;color:var(--amber);font-weight:500" id="warnings-count"></span>
+            </div>
+            <div class="panel-body" id="warnings-list"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Relevant Past Decisions</span>
+              <span style="font-size:10px;color:var(--muted)" id="decisions-count"></span>
+            </div>
+            <div class="panel-body" id="decisions-list"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Synthesized Briefing</span>
+              <button class="btn-copy" onclick="copyBriefing()">copy</button>
+            </div>
+            <div class="briefing-text" id="ctx-briefing">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Graph -->
+      <div class="view" id="view-graph">
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Decision Graph</span>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-ghost" onclick="runEngine()" style="font-size:10px;padding:5px 12px">Run weight engine</button>
+              <button class="btn btn-ghost" onclick="loadDecisions(currentDomain)" style="font-size:10px;padding:5px 12px">Refresh</button>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="filter-pills">
+              <span class="pill active" onclick="filterDomain('',this)">All</span>
+              <span class="pill" onclick="filterDomain('database',this)">Database</span>
+              <span class="pill" onclick="filterDomain('architecture',this)">Architecture</span>
+              <span class="pill" onclick="filterDomain('authentication',this)">Auth</span>
+              <span class="pill" onclick="filterDomain('deployment',this)">Deployment</span>
+              <span class="pill" onclick="filterDomain('infrastructure',this)">Infrastructure</span>
+            </div>
+            <div id="graph-list"><div class="empty">Select a domain filter or click Refresh to load decisions.</div></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+<script>
+  const API='http://localhost:8000';
+  let allDecisions=[],currentDomain='';
+
+  async function loadStats(){
+    try{
+      const res=await fetch(`${API}/graph/stats`);
+      const data=await res.json();
+      document.getElementById('stat-decisions').textContent=data.active_decisions??'—';
+      document.getElementById('stat-cfs').textContent=data.total_counterfactuals??'—';
+      document.getElementById('stat-sessions').textContent=data.total_sessions??'—';
+      document.getElementById('stat-weight').textContent=data.avg_epistemic_weight?data.avg_epistemic_weight.toFixed(3):'—';
+    }catch{document.getElementById('stat-decisions').textContent='offline';}
+  }
+
+  function switchView(name,el){
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    document.getElementById(`view-${name}`).classList.add('active');
+    if(el)el.classList.add('active');
+    const titles={ingest:'Ingest Session',context:'Retrieve Context',graph:'Decision Graph'};
+    document.getElementById('view-title').textContent=titles[name];
+  }
+
+  async function runIngest(){
+    const content=document.getElementById('ingest-content').value.trim();
+    if(content.length<50){alert('Content too short.');return;}
+    const btn=document.getElementById('btn-ingest');
+    btn.disabled=true;
+    document.getElementById('ingest-result').classList.remove('visible');
+    showStatus('ingest-status',true,'running extraction pipeline…');
+    try{
+      const res=await fetch(`${API}/ingest`,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({content,tool:document.getElementById('ingest-tool').value||'unknown',
+          captured_via:'manual_paste',project_id:document.getElementById('ingest-project').value||null})});
+      const data=await res.json();
+      document.getElementById('r-domain').textContent=data.domain_primary||'—';
+      document.getElementById('r-score').textContent=`critique ${data.critique_score??'?'}/10`;
+      document.getElementById('r-summary').textContent=data.session_summary||'—';
+      document.getElementById('r-decisions').textContent=data.saved_decisions??0;
+      document.getElementById('r-cfs').textContent=data.saved_counterfactuals??0;
+      document.getElementById('r-critique').textContent=`${data.critique_score??'?'}/10`;
+      document.getElementById('r-session').textContent=data.session_id?`id: ${data.session_id}`:'';
+      const errBlock=document.getElementById('r-error-block');
+      if(data.error){errBlock.style.display='block';document.getElementById('r-error').textContent=data.error;}
+      else errBlock.style.display='none';
+      document.getElementById('ingest-result').classList.add('visible');
+      showStatus('ingest-status',false,data.error?`⚠ ${data.error}`:`✓ ingested — ${data.saved_decisions} decisions, ${data.saved_counterfactuals} counterfactuals`);
+      loadStats();
+    }catch(e){showStatus('ingest-status',false,`error: ${e.message}`);}
+    finally{btn.disabled=false;}
+  }
+
+  async function runContext(){
+    const query=document.getElementById('ctx-query').value.trim();
+    if(!query){alert('Enter a query.');return;}
+    const btn=document.getElementById('btn-ctx');
+    btn.disabled=true;
+    document.getElementById('context-result').classList.remove('visible');
+    showStatus('ctx-status',true,'running 4-level causal retrieval…');
+    try{
+      const concernsRaw=document.getElementById('ctx-concerns').value;
+      const concerns=concernsRaw?concernsRaw.split(',').map(s=>s.trim()).filter(Boolean):[];
+      const domain=document.getElementById('ctx-domain').value.trim()||null;
+      const res=await fetch(`${API}/context`,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({query,domain,concerns})});
+      const data=await res.json();
+      const warnings=data.counterfactual_warnings||[];
+      const decisions=data.level1_decisions||[];
+      document.getElementById('warnings-count').textContent=warnings.length?`${warnings.length} warning${warnings.length>1?'s':''}`: 'none';
+      document.getElementById('decisions-count').textContent=decisions.length?`${decisions.length} found`:'none';
+      const warnList=document.getElementById('warnings-list');
+      warnList.innerHTML=warnings.length?warnings.map(w=>{
+        const cf=w.counterfactual||{};
+        return `<div class="cf-card"><div class="cf-header"><span class="cf-icon">⚠</span><span class="cf-option">You rejected "${esc(cf.rejected_option||'')}"</span></div><div class="cf-reason">${esc(cf.rejection_reason||'')}</div><div class="cf-meta">concern: ${cf.rejection_concern||'—'} &nbsp;·&nbsp; project: ${(w.session||{}).project_id||'—'}</div></div>`;
+      }).join(''):'<div class="empty">No counterfactual warnings for these concerns.</div>';
+      const decList=document.getElementById('decisions-list');
+      decList.innerHTML=decisions.length?decisions.slice(0,5).map(d=>renderDecisionCard(d)).join(''):'<div class="empty">No relevant past decisions found.</div>';
+      document.getElementById('ctx-briefing').textContent=data.briefing||'—';
+      document.getElementById('context-result').classList.add('visible');
+      showStatus('ctx-status',false,`✓ ${decisions.length} decisions · ${warnings.length} warnings · ~${Math.round(data.token_estimate||0)} tokens`);
+    }catch(e){showStatus('ctx-status',false,`error: ${e.message}`);}
+    finally{btn.disabled=false;}
+  }
+
+  async function loadDecisions(domain){
+    currentDomain=domain||'';
+    const list=document.getElementById('graph-list');
+    list.innerHTML='<div class="empty">Loading…</div>';
+    try{
+      const d=domain||'architecture';
+      const res=await fetch(`${API}/decisions?domain=${d}`);
+      const data=await res.json();
+      allDecisions=data;
+      renderGraph(data);
+    }catch(e){list.innerHTML=`<div class="empty">error: ${e.message}</div>`;}
+  }
+
+  function filterDomain(domain,pill){
+    currentDomain=domain;
+    document.querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
+    if(pill)pill.classList.add('active');
+    if(domain)loadDecisions(domain);
+    else{renderGraph(allDecisions.length?allDecisions:[]);if(!allDecisions.length)loadDecisions('architecture');}
+  }
+
+  function renderGraph(decisions){
+    const list=document.getElementById('graph-list');
+    if(!decisions.length){list.innerHTML='<div class="empty">No decisions in this domain yet. Ingest a session first.</div>';return;}
+    list.innerHTML=decisions.map(d=>renderDecisionCard(d,true)).join('');
+  }
+
+  function renderDecisionCard(d,showFull=false){
+    const weight=d.epistemic_weight||0.7;
+    const pct=Math.round(weight*100);
+    const invalid=d.is_invalidated?'<span class="tag tag-invalid">invalidated</span>':'';
+    const details=showFull&&d.reasoning?`<div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.65;padding-left:8px">${esc(d.reasoning)}</div>`:'';
+    return `<div class="decision-card" style="--glow-opacity:${weight.toFixed(2)}">
+      <div class="decision-summary">${esc(d.summary||d.chosen||'—')}</div>
+      <div class="decision-meta">
+        <span class="tag tag-domain">${d.domain||'—'}</span>
+        ${d.project_id?`<span class="tag tag-project">${esc(d.project_id)}</span>`:''}
+        ${invalid}
+      </div>
+      <div class="weight-bar">
+        <span class="weight-label">${pct}%</span>
+        <div class="weight-track"><div class="weight-fill" style="width:${pct}%"></div></div>
+      </div>${details}</div>`;
+  }
+
+  async function runEngine(){
+    try{
+      const res=await fetch(`${API}/graph/run-engine`,{method:'POST'});
+      const data=await res.json();
+      loadStats();
+      if(currentDomain!==undefined)loadDecisions(currentDomain);
+      alert(`Weight engine ran:\n• Decayed: ${data.decayed??0}\n• Overrides: ${data.overrides??0}\n• Contradictions: ${data.contradictions??0}`);
+    }catch(e){alert(`Engine error: ${e.message}`);}
+  }
+
+  function showStatus(id,loading,text){
+    const bar=document.getElementById(id);
+    bar.classList.add('visible');
+    const spinner=bar.querySelector('.spinner');
+    const span=bar.querySelector('span');
+    if(spinner)spinner.style.display=loading?'block':'none';
+    if(span&&text)span.textContent=text;
+  }
+
+  function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+  async function copyBriefing(){
+    const text=document.getElementById('ctx-briefing').textContent;
+    await navigator.clipboard.writeText(text);
+    const btn=document.querySelector('.btn-copy');
+    btn.textContent='Copied!';
+    setTimeout(()=>btn.textContent='copy',1500);
+  }
+
+  loadStats();
+  setInterval(loadStats,30000);
+</script>
+</body>
+</html>

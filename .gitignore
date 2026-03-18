@@ -1,0 +1,16 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.*
+!.env.example
+.doppler/
+.DS_Store
+.vscode/
+.idea/
+*.log
+.coverage
+htmlcov/
+.pytest_cache/
+coverage.xml

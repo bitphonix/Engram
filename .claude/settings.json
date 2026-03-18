@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "engram": {
+      "command": "python",
+      "args": ["/Users/adda247/Documents/Engram/app/mcp/server.py"],
+      "env": {
+        "ENGRAM_API_URL": "http://localhost:8000"
+      }
+    }
+  }
+}

@@ -1,0 +1,274 @@
+# Engram
+
+**Developer decision intelligence — causal memory across AI sessions.**
+
+Most AI memory tools store *what happened*. Engram stores *what was decided, what was rejected, and why* — building a living knowledge graph of your technical judgment that grows smarter every session.
+
+> Live demo: [engram.dev](https://engram.dev) &nbsp;·&nbsp; Built with LangGraph + Neo4j + Google Gemini
+
+[![CI](https://github.com/YOUR_USERNAME/engram/actions/workflows/ci.yml/badge.svg)](https://github.com/bitphonix/engram/actions)
+[![Python](https://img.shields.io/badge/python-3.11-e8650a)](https://python.org)
+[![Neo4j](https://img.shields.io/badge/graph-neo4j_auradb-008CC1)](https://neo4j.com/cloud/aura)
+[![LangGraph](https://img.shields.io/badge/agents-langgraph-1C3557)](https://langchain-ai.github.io/langgraph/)
+
+---
+
+## The problem
+
+Every AI session ends with lost context. You close the chat — and the decisions, the dead ends, the reasoning behind every choice — evaporate. You open a new session tomorrow and start over.
+
+Existing solutions only solve half the problem:
+
+| Tool | What it stores | What it misses |
+|---|---|---|
+| claude-mem | Tool outputs within a session | Rejected alternatives, cross-project patterns |
+| mem0 | Facts and preferences | The *why* behind decisions, counterfactuals |
+| Chat history | Everything | Signal in the noise, cross-session intelligence |
+
+**Engram stores what no other system does: the roads not taken.**
+
+When you chose PostgreSQL over MongoDB, the *rejection* contains more information than the choice. The concern that drove it, the reasoning, the constraints — that's the intelligence that should survive session boundaries.
+
+---
+
+## How it works
+
+Engram builds a **Temporal Causal Knowledge Graph** — decisions as nodes, relationships as typed edges, epistemic weights that evolve over time via passive signals.
+
+```
+You paste a session (or Claude Code captures it automatically via MCP)
+                        ↓
+        ┌───────────────────────────────────┐
+        │     LangGraph Extraction Pipeline │
+        │                                   │
+        │  Triage → Extract → Critique      │
+        │              ↑_________|          │
+        │         (reflection loop)         │
+        └───────────────────────────────────┘
+                        ↓
+           Atomic decisions + counterfactuals
+           written to Neo4j knowledge graph
+                        ↓
+        ┌───────────────────────────────────┐
+        │     Epistemic Weight Engine        │
+        │   (runs async, evolves weights)   │
+        │                                   │
+        │  Time decay · Override detection  │
+        │  Contradiction finder · Boost     │
+        └───────────────────────────────────┘
+                        ↓
+              4-Level Causal Retrieval
+     when you start a new session or face a decision
+```
+
+### The knowledge graph
+
+Every ingested session creates three types of nodes:
+
+**Decision nodes** — one per atomic choice. `chosen`, `reasoning`, `domain`, `situation_context`, `epistemic_weight`, `decay_rate`. Weight starts at 0.7 and evolves via passive signals.
+
+**Counterfactual nodes** — every rejected alternative. `rejected_option`, `rejection_reason`, `rejection_concern` (controlled vocabulary). This is the data no other system captures.
+
+**Outcome nodes** — what resulted. Populated by passive signals: git stability, override signals, propagation patterns.
+
+Typed relationships connect them: `PRODUCED`, `REJECTED`, `SUPERSEDES`, `CONTRADICTS`, `SIMILAR_TO`, `CHOSEN_LATER`.
+
+### The 4-level retrieval
+
+When you're about to make a decision, Engram traverses your history in four layers:
+
+```
+Level 1: Semantic search      → decision IDs + summaries       (~50 tokens)
+Level 2: Causal ancestry      → what led to similar decisions
+Level 3: Full episodes        → decision + counterfactuals + outcomes
+Level 4: Counterfactual surface → "You rejected X before. You're about to choose it now."
+```
+
+Level 4 is what makes Engram different. No other memory system surfaces past rejections as warnings.
+
+### The epistemic weight engine
+
+Decisions are not equally trustworthy. The weight engine runs asynchronously:
+
+- **Time decay** — `W(t) = W₀ · e^(-λt)` where λ is set by the triage agent per decision type (0.01 for architecture, 0.30 for trivial preferences)
+- **Override signal** — newer decisions in the same domain/project decay older ones
+- **Propagation boost** — retrieved and reused decisions gain weight
+- **Contradiction detection** — when a chosen option in one project is a rejected counterfactual in another, a `CONTRADICTS` edge is created automatically
+
+Good decisions solidify. Bad ones wither. No manual intervention required.
+
+---
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Capture Layer                                                    │
+│  MCP Server (Claude Code) · Manual paste (web UI) · API          │
+└──────────────────────┬───────────────────────────────────────────┘
+                       ↓
+┌──────────────────────────────────────────────────────────────────┐
+│  LangGraph Extraction Pipeline          (app/graph/)             │
+│                                                                   │
+│  triage_node     → is this worth processing? (flash model)       │
+│  extractor_node  → atomic decisions + counterfactuals (pro model) │
+│  critique_node   → validates extraction quality (flash model)    │
+│  graph_writer_node → writes Decision + Counterfactual nodes      │
+│  low_signal_node → graceful skip for noise                       │
+└──────────────────────┬───────────────────────────────────────────┘
+                       ↓
+┌──────────────────────────────────────────────────────────────────┐
+│  Neo4j AuraDB Knowledge Graph           (app/db/)                │
+│                                                                   │
+│  Decision nodes · Counterfactual nodes · Session nodes           │
+│  Typed relationships · Epistemic weights · Decay rates           │
+└──────────┬──────────────────────┬────────────────────────────────┘
+           ↓                      ↓
+┌──────────────────┐  ┌───────────────────────────────────────────┐
+│  4-Level         │  │  Epistemic Weight Engine  (app/agents/)   │
+│  Retrieval Agent │  │                                           │
+│  (app/agents/    │  │  Time decay · Override detection          │
+│  retrieval.py)   │  │  Contradiction finder · Propagation boost │
+└──────────────────┘  └───────────────────────────────────────────┘
+```
+
+---
+
+## Tech stack
+
+| Layer | Technology | Why |
+|---|---|---|
+| Agent framework | LangGraph 0.2 | Conditional edges for reflection loop, stateful pipeline |
+| LLM | Google Gemini 2.5 Pro/Flash | Pro for extraction quality, Flash for triage/critique |
+| Graph database | Neo4j AuraDB | Native graph traversal, typed relationships, causal queries |
+| API | FastAPI | Async, auto-docs, Pydantic validation |
+| MCP server | Python stdio | Passive capture from Claude Code — zero friction |
+| Observability | Datadog APM | Full trace per pipeline run |
+| Error tracking | Sentry | Real-time error capture |
+| Secret management | Doppler | Zero `.env` files, runtime injection |
+
+---
+
+## Agentic patterns demonstrated
+
+- **Multi-node LangGraph pipeline** — 5 specialized nodes, shared TypedDict state
+- **Triage gate** — cheap flash model decides if content is worth cloud API cost before processing
+- **Self-correction / reflection loop** — Critique node scores extraction quality, conditional edge routes back to extractor with feedback on failure
+- **Structured output extraction** — Pydantic models with controlled vocabulary fields for graph queryability
+- **Knowledge graph write** — decisions and counterfactuals as Neo4j nodes with typed relationships
+- **Causal graph traversal** — 4-level retrieval agent traverses ancestry and surfaces counterfactuals
+- **Passive epistemic weight evolution** — async background engine evolves node weights from multi-signal passive feedback
+- **MCP server** — stdio-based protocol server for Claude Code integration
+
+---
+
+## What makes this different
+
+**vs claude-mem:** claude-mem captures tool outputs within a single session. Engram captures the reasoning behind decisions and persists them across sessions, projects, and AI tools. claude-mem has no counterfactual storage. Engram's Level 4 retrieval surfaces past rejections as active warnings.
+
+**vs mem0:** mem0 is a developer SDK — you integrate it into your own app. Users cannot use it with existing AI tools. Engram is user-facing and works on top of any AI conversation. mem0 stores facts. Engram stores causal decision graphs with epistemic weights that evolve over time.
+
+---
+
+## Project structure
+
+```
+engram/
+├── app/
+│   ├── main.py              ← FastAPI entry point
+│   ├── graph/
+│   │   ├── state.py         ← TypedDict shared across all nodes
+│   │   ├── nodes.py         ← 6 agent node functions
+│   │   ├── edges.py         ← conditional routing logic
+│   │   └── pipeline.py      ← StateGraph assembly
+│   ├── agents/
+│   │   ├── retrieval.py     ← 4-level causal retrieval agent
+│   │   └── weight_engine.py ← epistemic weight evolution
+│   ├── db/
+│   │   ├── schema.py        ← Neo4j node types, relationships, Cypher queries
+│   │   └── neo4j_client.py  ← driver, constraints, CRUD with retry logic
+│   ├── models/
+│   │   └── extraction.py    ← Pydantic models for LLM structured output
+│   └── mcp/
+│       ├── server.py        ← MCP stdio server for Claude Code
+│       └── SETUP.md         ← installation instructions
+├── frontend/
+│   └── index.html           ← single-file UI (ingest · retrieve · graph view)
+└── requirements.txt
+```
+
+---
+
+## Running locally
+
+**Prerequisites:** Python 3.11+, [Doppler CLI](https://docs.doppler.com/docs/install-cli), [Neo4j AuraDB Free](https://neo4j.com/cloud/aura)
+
+```bash
+git clone https://github.com/bitphonix/engram
+cd engram
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+
+# Configure secrets
+doppler setup   # select project: engram, config: development
+# Required secrets:
+# NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD  → from AuraDB console
+# GEMINI_API_KEY                          → from aistudio.google.com
+# SENTRY_DSN                             → from sentry.io
+# DD_API_KEY, DD_SERVICE, DD_SITE        → from datadoghq.com
+
+doppler run -- uvicorn app.main:app --reload
+```
+
+Open `http://localhost:8000`
+
+### Claude Code integration (MCP)
+
+Add to `~/.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "engram": {
+      "command": "python",
+      "args": ["/absolute/path/to/engram/app/mcp/server.py"],
+      "env": { "ENGRAM_API_URL": "http://localhost:8000" }
+    }
+  }
+}
+```
+
+Then in any Claude Code session:
+- `"Capture this session to Engram"` → saves decisions to graph
+- `"What does Engram know about database choices?"` → 4-level retrieval
+- `"Have I rejected GraphQL before?"` → counterfactual warning
+
+---
+
+## Key design decisions
+
+**Why Neo4j over MongoDB for the brain store?**
+Decisions have relationships. A flat document store loses the causal structure — you can't query "what decisions led to this outcome" or "find all decisions where X was rejected" efficiently. Neo4j's native graph traversal makes Level 2 and Level 4 retrieval possible in single Cypher queries.
+
+**Why counterfactuals as first-class nodes?**
+Every other memory system stores what was chosen. The rejection contains more signal — it carries the constraint, the concern, the reasoning. Making counterfactuals queryable nodes (with `rejection_concern` as controlled vocabulary) enables Level 4 retrieval: find past rejections by concern type, regardless of project or time.
+
+**Why a triage agent before cloud API calls?**
+80% of captured content is noise — typo fixes, casual questions, trivial adjustments. Running a local flash model as a gate prevents that noise from hitting expensive Pro model calls and polluting the graph with low-quality data.
+
+**Why decay rates set at extraction time?**
+Architectural decisions should outlast bug fixes. Setting `decay_rate` per-decision at extraction time (0.01 for architecture, 0.30 for trivial preferences) means the weight engine applies the right decay curve automatically — no human categorization needed later.
+
+---
+
+## Roadmap
+
+- [ ] Local SLM triage (ONNX) — replace cloud flash model for triage to eliminate cost entirely
+- [ ] File system watcher — passive capture from IDE without Claude Code
+- [ ] Browser extension — capture from Claude.ai, ChatGPT, Gemini web UI
+- [ ] Graph visualization — interactive D3.js graph of your decision history
+- [ ] Outcome feedback loop — git signals and override patterns update weights automatically
+
+---
+
+Built by [Tanishk](https://github.com/bitphonix) · [LinkedIn](https://linkedin.com/in/tanishk-soni-a94077239)
