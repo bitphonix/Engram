@@ -165,44 +165,19 @@ def get_decision(decision_id: str):
 @app.post("/context")
 def get_context(req: ContextRequest):
     """
-    4-level context retrieval.
-    Returns relevant past decisions and counterfactual warnings
-    for injecting into a new AI session.
+    4-level causal retrieval.
+    Level 1: semantic vector search → decision IDs
+    Level 2: causal ancestry → what led to similar decisions
+    Level 3: full episodes → decision + counterfactuals + outcomes
+    Level 4: counterfactual surface → rejected paths you should know about
     """
-    warnings = []
-    if req.concerns:
-        warnings = surface_counterfactuals(req.concerns)
-
-    decisions = []
-    if req.domain:
-        decisions = get_similar_decisions(req.domain)
-
-    # Build injection briefing
-    briefing_parts = []
-
-    if decisions:
-        briefing_parts.append("RELEVANT PAST DECISIONS:")
-        for d in decisions[:3]:
-            briefing_parts.append(
-                f"- {d.get('summary', '')} "
-                f"(confidence: {d.get('epistemic_weight', 0):.1f})"
-            )
-
-    if warnings:
-        briefing_parts.append("\nCOUNTERFACTUAL WARNINGS — you rejected these before:")
-        for w in warnings:
-            cf = w.get("counterfactual", {})
-            briefing_parts.append(
-                f"- You rejected '{cf.get('rejected_option', '')}' "
-                f"because: {cf.get('rejection_reason', '')} "
-                f"[concern: {cf.get('rejection_concern', '')}]"
-            )
-
-    briefing = "\n".join(briefing_parts) if briefing_parts else "No relevant past decisions found."
-
-    return {
-        "relevant_decisions":      decisions[:5],
-        "counterfactual_warnings": warnings,
-        "briefing":                briefing,
-        "token_estimate":          len(briefing.split()) * 1.3,
-    }
+    result = retrieve_context(
+        query=req.query,
+        domain=req.domain,
+        concerns=req.concerns,
+    )
+    # Propagation signal — boost weight of retrieved decisions
+    retrieved_ids = [d.get("id") for d in result.get("level1_decisions", []) if d.get("id")]
+    if retrieved_ids:
+        boost_retrieved_decisions(retrieved_ids)
+    return result

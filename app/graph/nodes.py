@@ -215,25 +215,23 @@ Return JSON only:
 # ── Node 4: Graph Writer ───────────────────────────────────────────────────────
 def graph_writer_node(state: State) -> dict:
     """
-    Writes all extracted decisions and counterfactuals to Neo4j.
-    Called only after critique passes.
+    Writes all extracted decisions and counterfactuals to Neo4j AND Atlas Vector Search.
 
     For each decision:
-    1. Creates a Session node (if not exists)
-    2. Creates one Decision node per atomic decision
-    3. Creates one Counterfactual node per rejected alternative
-    4. Creates all relationships in the graph
-
-    This is where the knowledge graph gets built.
+    1. Creates Session node in Neo4j
+    2. Creates Decision node in Neo4j
+    3. Embeds decision text and stores in Atlas (for semantic search)
+    4. Creates Counterfactual nodes in Neo4j
+    5. Embeds each counterfactual and stores in Atlas
     """
     from app.db.neo4j_client import save_session, save_decision, save_counterfactual
+    from app.db.vector_client import embed_and_store_decision, embed_and_store_counterfactual
 
     decisions = state.get("decisions") or []
     if not decisions:
         return {"saved_decision_ids": [], "saved_counterfact_ids": []}
 
     try:
-        # Create session node
         session_id = save_session(
             tool=state.get("tool", "unknown"),
             project_id=state.get("project_id"),
@@ -241,17 +239,16 @@ def graph_writer_node(state: State) -> dict:
             raw_excerpt=state["raw_content"][:500],
         )
 
-        saved_decision_ids   = []
+        saved_decision_ids    = []
         saved_counterfact_ids = []
 
         for decision in decisions:
-            # Handle both Pydantic model and dict
             d = decision if isinstance(decision, dict) else decision.model_dump()
 
-            # Skip low-confidence extractions
             if d.get("confidence", 1.0) < 0.5:
                 continue
 
+            # Write to Neo4j
             decision_id = save_decision(
                 summary=          d["summary"],
                 chosen=           d["chosen"],
@@ -266,9 +263,20 @@ def graph_writer_node(state: State) -> dict:
             )
             saved_decision_ids.append(decision_id)
 
-            # Write counterfactuals — the most valuable data
+            # Embed and store in Atlas Vector Search
+            embed_and_store_decision(
+                decision_id=      decision_id,
+                summary=          d["summary"],
+                reasoning=        d["reasoning"],
+                domain=           d["domain"],
+                situation_context=d["situation_context"],
+                project_id=       state.get("project_id"),
+            )
+
+            # Write counterfactuals to Neo4j + Atlas
             for cf in d.get("counterfactuals", []):
                 c = cf if isinstance(cf, dict) else cf.model_dump()
+
                 cf_id = save_counterfactual(
                     rejected_option=  c["rejected_option"],
                     rejection_reason= c["rejection_reason"],
@@ -279,9 +287,20 @@ def graph_writer_node(state: State) -> dict:
                 )
                 saved_counterfact_ids.append(cf_id)
 
+                # Embed counterfactual for semantic search
+                embed_and_store_counterfactual(
+                    cf_id=             cf_id,
+                    rejected_option=   c["rejected_option"],
+                    rejection_reason=  c["rejection_reason"],
+                    rejection_concern= c["rejection_concern"],
+                    situation_context= d["situation_context"],
+                    decision_id=       decision_id,
+                    project_id=        state.get("project_id"),
+                )
+
         return {
-            "session_id":           session_id,
-            "saved_decision_ids":   saved_decision_ids,
+            "session_id":            session_id,
+            "saved_decision_ids":    saved_decision_ids,
             "saved_counterfact_ids": saved_counterfact_ids,
         }
 

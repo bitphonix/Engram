@@ -34,22 +34,44 @@ _flash = ChatGoogleGenerativeAI(
 )
 
 
-# ── Level 1: Semantic search ──────────────────────────────────────────────────
-def level1_search(domain: str, limit: int = 8) -> list[dict]:
+# ── Level 1: Semantic search (Atlas Vector Search) ────────────────────────────
+def level1_search(query: str, domain: str = None, limit: int = 8) -> list[dict]:
     """
-    Fast domain-based lookup. Returns decision IDs and one-line summaries.
+    True semantic search over all stored decision vectors.
+    Uses Atlas Vector Search with cosine similarity.
+
+    Returns decision IDs + summaries + scores.
     Token cost: ~50 tokens per result.
+
+    Falls back to Neo4j domain search if Atlas is unavailable.
     """
-    decisions = get_similar_decisions(domain)
-    return [
-        {
-            "id":               d.get("id"),
-            "summary":          d.get("summary"),
-            "epistemic_weight": d.get("epistemic_weight"),
-            "domain":           d.get("domain"),
-        }
-        for d in decisions[:limit]
-    ]
+    from app.db.vector_client import semantic_search
+
+    # Try vector search first
+    vector_results = semantic_search(
+        query=query,
+        limit=limit,
+        domain_filter=domain,   # None = search all domains
+        node_type_filter="decision",
+    )
+
+    if vector_results:
+        return vector_results
+
+    # Fallback to Neo4j domain filter if vector search fails
+    if domain:
+        decisions = get_similar_decisions(domain)
+        return [
+            {
+                "id":               d.get("id"),
+                "summary":          d.get("summary"),
+                "epistemic_weight": d.get("epistemic_weight"),
+                "domain":           d.get("domain"),
+                "score":            d.get("epistemic_weight", 0.7),
+            }
+            for d in decisions[:limit]
+        ]
+    return []
 
 
 # ── Level 2: Causal ancestry ──────────────────────────────────────────────────
@@ -244,11 +266,11 @@ def retrieve_context(
         dict with all retrieval levels + synthesized briefing
     """
     # Extract domain and concerns if not provided
-    resolved_domain   = domain   or extract_domain_from_query(query)
+    resolved_domain   = domain
     resolved_concerns = concerns or extract_concerns_from_query(query)
 
-    # Level 1: Fast ID lookup
-    l1 = level1_search(resolved_domain)
+    # Level 1: True semantic search over Atlas Vector Search
+    l1 = level1_search(query=query, domain=resolved_domain)
 
     # Level 2: Causal ancestry (only if we found decisions)
     decision_ids = [d["id"] for d in l1 if d.get("id")]
