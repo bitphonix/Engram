@@ -213,16 +213,33 @@ async def call_engram_warn(option: str, concern: str = None) -> str:
         resp.raise_for_status()
         data = resp.json()
 
-    warnings = data.get("counterfactual_warnings", [])
+    warnings = data.get("level4_warnings", data.get("counterfactual_warnings", []))
+
+    # Exact or partial match first
     relevant = [
         w for w in warnings
         if option.lower() in w.get("counterfactual", {}).get("rejected_option", "").lower()
+        or w.get("counterfactual", {}).get("rejected_option", "").lower() in option.lower()
     ]
+
+    # If no exact match, fall back to all semantic warnings from the context query
+    # This catches cases like "Kafka" matching "Kafka + ClickHouse"
+    if not relevant and warnings:
+        relevant = warnings
+        lines = [f"No exact match for '{option}', but semantically related rejections in your history:"]
+        for w in relevant:
+            cf = w.get("counterfactual", {})
+            lines.append(
+                f"  • Rejected '{cf.get('rejected_option', '')}' [{cf.get('rejection_concern', '')}]"
+            )
+            lines.append(f"    {cf.get('rejection_reason', '')}")
+            lines.append(f"    Project: {w.get('session', {}).get('project_id', 'unknown')}")
+        return "\n".join(lines)
 
     if not relevant:
         return f"Engram: No past rejections of '{option}' found in your history."
 
-    lines = [f"⚠ Engram: You've rejected '{option}' before:"]
+    lines = [f"⚠ Engram: You've rejected '{option}' (or similar) before:"]
     for w in relevant:
         cf = w.get("counterfactual", {})
         lines.append(
