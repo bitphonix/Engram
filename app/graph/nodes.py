@@ -226,6 +226,7 @@ def graph_writer_node(state: State) -> dict:
     """
     from app.db.neo4j_client import save_session, save_decision, save_counterfactual
     from app.db.vector_client import embed_and_store_decision, embed_and_store_counterfactual
+    from app.agents.linker import link_decision
 
     decisions = state.get("decisions") or []
     if not decisions:
@@ -271,6 +272,16 @@ def graph_writer_node(state: State) -> dict:
                 domain=           d["domain"],
                 situation_context=d["situation_context"],
                 project_id=       state.get("project_id"),
+            )
+
+            # Link this decision to related decisions in the graph
+            # Creates CAUSED_BY, SUPERSEDES, SIMILAR_TO edges
+            link_decision(
+                decision_id= decision_id,
+                summary=     d["summary"],
+                domain=      d["domain"],
+                project_id=  state.get("project_id"),
+                raw_content= state.get("raw_content", ""),
             )
 
             # Write counterfactuals to Neo4j + Atlas

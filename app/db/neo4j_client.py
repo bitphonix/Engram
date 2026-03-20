@@ -152,9 +152,13 @@ def get_similar_decisions(domain: str) -> list[dict]:
 
 
 def get_causal_ancestry(decision_id: str) -> list[dict]:
+    query = """
+        MATCH (d:Decision {id: $decision_id})-[:CAUSED_BY*1..3]->(ancestor:Decision)
+        RETURN ancestor
+        LIMIT 10
+    """
     with get_driver().session() as session:
-        result = _run_with_retry(session, CYPHER["causal_ancestry"],
-                                 {"decision_id": decision_id})
+        result = _run_with_retry(session, query, {"decision_id": decision_id})
         return [dict(r["ancestor"]) for r in result]
 
 
@@ -186,3 +190,58 @@ def surface_counterfactuals(concerns: list[str]) -> list[dict]:
 def soft_invalidate(decision_id: str):
     with get_driver().session() as session:
         _run_with_retry(session, CYPHER["soft_invalidate"], {"decision_id": decision_id})
+
+
+def create_caused_by_edge(new_decision_id: str, prior_decision_id: str):
+    """New decision was caused by / built on top of a prior decision."""
+    query = """
+        MATCH (new:Decision {id: $new_id})
+        MATCH (prior:Decision {id: $prior_id})
+        MERGE (new)-[:CAUSED_BY]->(prior)
+    """
+    with get_driver().session() as session:
+        _run_with_retry(session, query, {"new_id": new_decision_id, "prior_id": prior_decision_id})
+
+
+def create_supersedes_edge(new_decision_id: str, old_decision_id: str):
+    """New decision supersedes an older decision in the same domain/project."""
+    query = """
+        MATCH (new:Decision {id: $new_id})
+        MATCH (old:Decision {id: $old_id})
+        MERGE (new)-[:SUPERSEDES]->(old)
+        SET old.is_invalidated = true
+    """
+    with get_driver().session() as session:
+        _run_with_retry(session, query, {"new_id": new_decision_id, "old_id": old_decision_id})
+
+
+def create_similar_to_edge(decision_id_a: str, decision_id_b: str, similarity_score: float):
+    """Two decisions are semantically similar across projects."""
+    query = """
+        MATCH (a:Decision {id: $id_a})
+        MATCH (b:Decision {id: $id_b})
+        MERGE (a)-[r:SIMILAR_TO]->(b)
+        SET r.score = $score
+    """
+    with get_driver().session() as session:
+        _run_with_retry(session, query,
+                        {"id_a": decision_id_a, "id_b": decision_id_b, "score": similarity_score})
+
+
+def get_decisions_by_domain_project(domain: str, project_id: str,
+                                     exclude_id: str) -> list[dict]:
+    """Get existing decisions in the same domain + project for supersedes detection."""
+    query = """
+        MATCH (d:Decision)
+        WHERE d.domain = $domain
+          AND d.project_id = $project_id
+          AND d.id <> $exclude_id
+          AND d.is_invalidated = false
+        RETURN d
+        ORDER BY d.created_at ASC
+    """
+    with get_driver().session() as session:
+        result = _run_with_retry(session, query,
+                                  {"domain": domain, "project_id": project_id,
+                                   "exclude_id": exclude_id})
+        return [dict(r["d"]) for r in result]

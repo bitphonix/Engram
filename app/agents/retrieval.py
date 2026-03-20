@@ -274,6 +274,11 @@ def retrieve_context(
 
     # Level 2: Causal ancestry (only if we found decisions)
     decision_ids = [d["id"] for d in l1 if d.get("id")]
+    # Fallback: if Atlas is down, use Neo4j domain search for IDs
+    if not decision_ids and resolved_domain:
+        fallback = get_similar_decisions(resolved_domain)
+        decision_ids = [d.get("id") for d in fallback if d.get("id")]
+        l1 = fallback
     l2 = level2_ancestry(decision_ids) if decision_ids else []
 
     # Level 3: Full episodes for top decisions
