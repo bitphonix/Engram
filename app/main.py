@@ -26,7 +26,6 @@ from app.db.neo4j_client import (
 from app.agents.retrieval import retrieve_context
 from app.agents.weight_engine import run_weight_engine, get_graph_stats, boost_retrieved_decisions
 
-# ── Sentry ────────────────────────────────────────────────────────────────────
 sentry_sdk.init(
     dsn=os.getenv("SENTRY_DSN", ""),
     traces_sample_rate=1.0,
@@ -39,7 +38,6 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# ── Startup ───────────────────────────────────────────────────────────────────
 @app.on_event("startup")
 def on_startup():
     try:
@@ -48,7 +46,6 @@ def on_startup():
         print(f"Warning: Neo4j constraint setup failed: {e}")
 
 
-# ── Serve frontend ─────────────────────────────────────────────────────────────
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
 
 @app.get("/")
@@ -59,7 +56,6 @@ def serve_frontend():
     return {"message": "Engram API running. Frontend not built yet."}
 
 
-# ── Request / Response models ──────────────────────────────────────────────────
 class IngestRequest(BaseModel):
     content:      str
     tool:         str = "unknown"
@@ -75,7 +71,7 @@ class IngestResponse(BaseModel):
     is_high_signal:        bool
     session_summary:       Optional[str]
     domain_primary:        Optional[str]
-    critique_score:        Optional[int]
+    critique_score:        Optional[float]
     error:                 Optional[str] = None
 
 
@@ -86,7 +82,6 @@ class ContextRequest(BaseModel):
     project_id: Optional[str] = None
 
 
-# ── Routes ─────────────────────────────────────────────────────────────────────
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "engram"}

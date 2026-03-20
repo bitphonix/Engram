@@ -1,46 +1,60 @@
 """
-Engram — Atlas Vector Search client.
-Uses Gemini REST API directly — no SDK version conflicts.
-Model: gemini-embedding-001 via v1beta, output truncated to 768 dims.
+Engram — Vector Search client using ChromaDB (local-first).
+
+Stores embeddings on disk at ~/.engram/chroma — no network dependency,
+no IP whitelisting, works on any network. Embeddings are generated via
+the Gemini REST API and stored locally.
+
+Architecture:
+  Write time: Decision/counterfactual saved → embed → store in ChromaDB
+  Read time:  Query → embed → ChromaDB cosine similarity → decision IDs
+
+ChromaDB replaces MongoDB Atlas Vector Search. Same cosine similarity,
+same 768-dimension embeddings, zero external service dependency.
 """
 import os
 import requests
+from pathlib import Path
 from typing import Optional
-from pymongo import MongoClient
 
-VECTOR_INDEX     = "engram_vector_index"
-MONGO_DB         = "engram"
-MONGO_COLLECTION = "vectors"
-EMBEDDING_MODEL  = "gemini-embedding-001"
-GEMINI_API_URL   = f"https://generativelanguage.googleapis.com/v1beta/models/{EMBEDDING_MODEL}:embedContent"
-EMBEDDING_DIMS   = 768
+import chromadb
+from chromadb.config import Settings
 
-_mongo_client = None
-_collection   = None
+CHROMA_DIR      = Path.home() / ".engram" / "chroma"
+COLLECTION_NAME = "engram_decisions"
+EMBEDDING_MODEL = "gemini-embedding-001"
+GEMINI_API_URL  = f"https://generativelanguage.googleapis.com/v1beta/models/{EMBEDDING_MODEL}:embedContent"
+EMBEDDING_DIMS  = 768
+
+_client     = None
+_collection = None
 
 
 def _get_collection():
-    global _mongo_client, _collection
+    global _client, _collection
     if _collection is None:
-        uri = os.getenv("MONGODB_URI")
-        if not uri:
-            raise RuntimeError("MONGODB_URI not set.")
-        _mongo_client = MongoClient(uri)
-        _collection   = _mongo_client[MONGO_DB][MONGO_COLLECTION]
+        CHROMA_DIR.mkdir(parents=True, exist_ok=True)
+        _client = chromadb.PersistentClient(
+            path=str(CHROMA_DIR),
+            settings=Settings(anonymized_telemetry=False),
+        )
+        _collection = _client.get_or_create_collection(
+            name=COLLECTION_NAME,
+            metadata={"hnsw:space": "cosine"},
+        )
     return _collection
 
 
 def _embed(text: str, task_type: str = "retrieval_document") -> list[float]:
     """
-    Call Gemini REST API for embeddings.
-    output_dimensionality=768 keeps compatibility with existing Atlas index.
-    task_type: retrieval_document for writes, retrieval_query for searches.
+    Gemini REST API embedding. No SDK — no version conflicts.
+    output_dimensionality=768 matches our ChromaDB collection config.
     """
     api_key = os.getenv("GEMINI_API_KEY")
     payload = {
-        "model":                f"models/{EMBEDDING_MODEL}",
-        "content":              {"parts": [{"text": text}]},
-        "taskType":             task_type,
+        "model":                 f"models/{EMBEDDING_MODEL}",
+        "content":               {"parts": [{"text": text}]},
+        "taskType":              task_type,
         "output_dimensionality": EMBEDDING_DIMS,
     }
     resp = requests.post(
@@ -52,7 +66,6 @@ def _embed(text: str, task_type: str = "retrieval_document") -> list[float]:
     return resp.json()["embedding"]["values"]
 
 
-# ── Write operations ───────────────────────────────────────────────────────────
 
 def embed_and_store_decision(
     decision_id: str,
@@ -62,21 +75,29 @@ def embed_and_store_decision(
     situation_context: str,
     project_id: Optional[str] = None,
 ) -> bool:
+    """
+    Embeds a decision and stores it in ChromaDB.
+    Called by graph_writer_node after each decision is saved to Neo4j.
+    """
     try:
         text      = f"{summary}. Context: {situation_context}. Reasoning: {reasoning}"
         embedding = _embed(text, task_type="retrieval_document")
-        doc = {
-            "_id":        decision_id,
-            "node_type":  "decision",
-            "summary":    summary,
-            "domain":     domain,
-            "project_id": project_id,
-            "embedding":  embedding,
-        }
-        _get_collection().replace_one({"_id": decision_id}, doc, upsert=True)
+        col       = _get_collection()
+
+        col.upsert(
+            ids=[decision_id],
+            embeddings=[embedding],
+            metadatas=[{
+                "node_type":  "decision",
+                "summary":    summary[:500],
+                "domain":     domain or "other",
+                "project_id": project_id or "",
+            }],
+            documents=[text[:1000]],
+        )
         return True
     except Exception as e:
-        print(f"Vector write failed for decision {decision_id}: {e}")
+        print(f"ChromaDB write failed for decision {decision_id}: {e}")
         return False
 
 
@@ -89,6 +110,10 @@ def embed_and_store_counterfactual(
     decision_id: str,
     project_id: Optional[str] = None,
 ) -> bool:
+    """
+    Embeds a counterfactual and stores it in ChromaDB.
+    Counterfactuals are searchable — enables Level 4 semantic warnings.
+    """
     try:
         text = (
             f"Rejected: {rejected_option}. "
@@ -97,23 +122,26 @@ def embed_and_store_counterfactual(
             f"Context: {situation_context}"
         )
         embedding = _embed(text, task_type="retrieval_document")
-        doc = {
-            "_id":               cf_id,
-            "node_type":         "counterfactual",
-            "rejected_option":   rejected_option,
-            "rejection_concern": rejection_concern,
-            "decision_id":       decision_id,
-            "project_id":        project_id,
-            "embedding":         embedding,
-        }
-        _get_collection().replace_one({"_id": cf_id}, doc, upsert=True)
+        col       = _get_collection()
+
+        col.upsert(
+            ids=[cf_id],
+            embeddings=[embedding],
+            metadatas=[{
+                "node_type":         "counterfactual",
+                "rejected_option":   rejected_option[:200],
+                "rejection_concern": rejection_concern or "",
+                "decision_id":       decision_id,
+                "project_id":        project_id or "",
+            }],
+            documents=[text[:1000]],
+        )
         return True
     except Exception as e:
-        print(f"Vector write failed for counterfactual {cf_id}: {e}")
+        print(f"ChromaDB write failed for counterfactual {cf_id}: {e}")
         return False
 
 
-# ── Search operations ──────────────────────────────────────────────────────────
 
 def semantic_search(
     query: str,
@@ -121,50 +149,57 @@ def semantic_search(
     domain_filter: Optional[str] = None,
     node_type_filter: str = "decision",
 ) -> list[dict]:
+    """
+    Level 1 retrieval — cosine similarity search over all stored vectors.
+    No network required. Works on any network. Instant.
+
+    domain_filter=None searches ALL domains — key for cross-domain retrieval.
+    """
     try:
         query_embedding = _embed(query, task_type="retrieval_query")
-        collection      = _get_collection()
+        col             = _get_collection()
 
-        vector_stage = {
-            "$vectorSearch": {
-                "index":         VECTOR_INDEX,
-                "path":          "embedding",
-                "queryVector":   query_embedding,
-                "numCandidates": limit * 10,
-                "limit":         limit,
-            }
+        where = None
+        if domain_filter and node_type_filter:
+            where = {"$and": [
+                {"domain":    {"$eq": domain_filter}},
+                {"node_type": {"$eq": node_type_filter}},
+            ]}
+        elif domain_filter:
+            where = {"domain": {"$eq": domain_filter}}
+        elif node_type_filter:
+            where = {"node_type": {"$eq": node_type_filter}}
+
+        kwargs = {
+            "query_embeddings": [query_embedding],
+            "n_results":        min(limit, col.count()),
+            "include":          ["metadatas", "distances"],
         }
+        if where:
+            kwargs["where"] = where
 
-        if domain_filter:
-            vector_stage["$vectorSearch"]["filter"] = {"domain": {"$eq": domain_filter}}
+        if col.count() == 0:
+            return []
 
-        pipeline = [
-            vector_stage,
-            {"$project": {
-                "_id": 1, "node_type": 1, "domain": 1,
-                "project_id": 1, "summary": 1, "rejected_option": 1,
-                "score": {"$meta": "vectorSearchScore"},
-            }}
-        ]
+        results = col.query(**kwargs)
 
-        results = list(collection.aggregate(pipeline))
-        # Filter by node_type in Python — more reliable than Atlas filter
-        if node_type_filter:
-            results = [r for r in results if r.get("node_type") == node_type_filter]
-        
+        ids        = results["ids"][0]
+        metadatas  = results["metadatas"][0]
+        distances  = results["distances"][0]
+
         return [
             {
-                "id":         str(r["_id"]),
-                "score":      r.get("score", 0),
-                "node_type":  r.get("node_type"),
-                "domain":     r.get("domain"),
-                "project_id": r.get("project_id"),
-                "summary":    r.get("summary", r.get("rejected_option", "")),
+                "id":         ids[i],
+                "score":      round(1 - distances[i], 4),
+                "node_type":  metadatas[i].get("node_type"),
+                "domain":     metadatas[i].get("domain"),
+                "project_id": metadatas[i].get("project_id") or None,
+                "summary":    metadatas[i].get("summary", ""),
             }
-            for r in results
+            for i in range(len(ids))
         ]
     except Exception as e:
-        print(f"Vector search failed: {e}")
+        print(f"ChromaDB search failed: {e}")
         return []
 
 
@@ -173,45 +208,59 @@ def semantic_search_counterfactuals(
     concern_filter: Optional[str] = None,
     limit: int = 5,
 ) -> list[dict]:
+    """
+    Semantic search specifically over counterfactual nodes.
+    Used by Level 4 retrieval to find semantically similar rejections.
+    """
     try:
         query_embedding = _embed(query, task_type="retrieval_query")
-        collection      = _get_collection()
+        col             = _get_collection()
 
-        cf_filter = {"node_type": {"$eq": "counterfactual"}}
+        if col.count() == 0:
+            return []
+
+        where = {"node_type": {"$eq": "counterfactual"}}
         if concern_filter:
-            cf_filter = {"$and": [
+            where = {"$and": [
                 {"node_type":         {"$eq": "counterfactual"}},
                 {"rejection_concern": {"$eq": concern_filter}},
             ]}
 
-        pipeline = [
-            {"$vectorSearch": {
-                "index":         VECTOR_INDEX,
-                "path":          "embedding",
-                "queryVector":   query_embedding,
-                "numCandidates": limit * 10,
-                "limit":         limit,
-                "filter":        cf_filter,
-            }},
-            {"$project": {
-                "_id": 1, "rejected_option": 1, "rejection_concern": 1,
-                "decision_id": 1, "project_id": 1,
-                "score": {"$meta": "vectorSearchScore"},
-            }}
-        ]
+        results = col.query(
+            query_embeddings=[query_embedding],
+            n_results=min(limit, col.count()),
+            where=where,
+            include=["metadatas", "distances"],
+        )
 
-        results = list(collection.aggregate(pipeline))
+        ids       = results["ids"][0]
+        metadatas = results["metadatas"][0]
+        distances = results["distances"][0]
+
         return [
             {
-                "id":                str(r["_id"]),
-                "decision_id":       r.get("decision_id"),
-                "rejected_option":   r.get("rejected_option"),
-                "rejection_concern": r.get("rejection_concern"),
-                "project_id":        r.get("project_id"),
-                "score":             r.get("score", 0),
+                "id":                ids[i],
+                "decision_id":       metadatas[i].get("decision_id"),
+                "rejected_option":   metadatas[i].get("rejected_option"),
+                "rejection_concern": metadatas[i].get("rejection_concern"),
+                "project_id":        metadatas[i].get("project_id") or None,
+                "score":             round(1 - distances[i], 4),
             }
-            for r in results
+            for i in range(len(ids))
         ]
     except Exception as e:
-        print(f"Counterfactual vector search failed: {e}")
+        print(f"ChromaDB counterfactual search failed: {e}")
         return []
+
+
+def get_collection_stats() -> dict:
+    """Returns ChromaDB collection health info."""
+    try:
+        col = _get_collection()
+        return {
+            "total_vectors": col.count(),
+            "storage_path":  str(CHROMA_DIR),
+            "backend":       "chromadb_local",
+        }
+    except Exception as e:
+        return {"error": str(e)}
