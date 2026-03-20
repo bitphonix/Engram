@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Engram CLI — developer decision intelligence.
 
@@ -28,8 +27,6 @@ import subprocess
 import platform
 from pathlib import Path
 
-# ── Config ─────────────────────────────────────────────────────────────────────
-
 ENGRAM_DIR      = Path.home() / ".engram"
 PID_FILE        = ENGRAM_DIR / "server.pid"
 LOG_FILE        = ENGRAM_DIR / "server.log"
@@ -37,7 +34,6 @@ CONFIG_FILE     = ENGRAM_DIR / "config.json"
 DEFAULT_PORT    = 8000
 DEFAULT_API_URL = f"http://localhost:{DEFAULT_PORT}"
 
-# Colors for terminal output
 GREEN  = "\033[92m"
 ORANGE = "\033[93m"
 RED    = "\033[91m"
@@ -53,7 +49,6 @@ def info(msg):  print(f"{BLUE}→{RESET} {msg}")
 def dim(msg):   print(f"{DIM}{msg}{RESET}")
 
 
-# ── Helpers ─────────────────────────────────────────────────────────────────────
 
 def get_engram_root() -> Path:
     """Find the Engram project root — where main.py lives."""
@@ -99,11 +94,17 @@ def get_api_url() -> str:
 
 
 def is_server_running() -> bool:
+    try:
+        call_api("/health")
+        return True
+    except Exception:
+        pass
+  
     if not PID_FILE.exists():
         return False
     try:
         pid = int(PID_FILE.read_text().strip())
-        os.kill(pid, 0)  # signal 0 = check if process exists
+        os.kill(pid, 0)
         return True
     except (ProcessLookupError, PermissionError, ValueError):
         PID_FILE.unlink(missing_ok=True)
@@ -128,7 +129,6 @@ def call_api(path: str, method: str = "GET", data: dict = None) -> dict:
         return json.loads(resp.read().decode())
 
 
-# ── Commands ───────────────────────────────────────────────────────────────────
 
 def cmd_start(args):
     """Start the Engram server as a background daemon."""
@@ -150,8 +150,6 @@ def cmd_start(args):
         "api_url": f"http://localhost:{port}",
     }, indent=2))
 
-    # Build the command
-    # Use doppler if available, otherwise use environment directly
     doppler = shutil.which("doppler")
     if doppler:
         cmd = [doppler, "run", "--", python, "-m", "uvicorn",
@@ -173,7 +171,6 @@ def cmd_start(args):
 
     PID_FILE.write_text(str(proc.pid))
 
-    # Wait for server to be ready
     for i in range(20):
         time.sleep(0.5)
         try:
@@ -210,8 +207,11 @@ def cmd_status(args):
 
     # Server status
     if is_server_running():
-        pid = int(PID_FILE.read_text().strip())
-        ok(f"Server running  (pid {pid})  →  {get_api_url()}")
+        if PID_FILE.exists():
+            pid = PID_FILE.read_text().strip()
+            ok(f"Server running  (pid {pid})  →  {get_api_url()}")
+        else:
+            ok(f"Server running (managed by launchd)  →  {get_api_url()}")
     else:
         err("Server not running. Run: engram start")
         return
@@ -348,7 +348,7 @@ def cmd_install(args):
         }
     }
 
-    # ── Claude Code ──────────────────────────────────────────────────────────
+    # ── Claude Code ─────────────────────────────────────────────────
     claude_settings = Path.home() / ".claude" / "settings.json"
     claude_settings.parent.mkdir(exist_ok=True)
 
@@ -364,7 +364,7 @@ def cmd_install(args):
     claude_settings.write_text(json.dumps(existing, indent=2))
     ok(f"Claude Code   →  {claude_settings}")
 
-    # ── Cursor ───────────────────────────────────────────────────────────────
+    # ── Cursor ──────────────────────────────────────────────────────
     cursor_config = Path.home() / ".cursor" / "mcp.json"
     cursor_config.parent.mkdir(exist_ok=True)
 
@@ -380,7 +380,7 @@ def cmd_install(args):
     cursor_config.write_text(json.dumps(existing_cursor, indent=2))
     ok(f"Cursor        →  {cursor_config}")
 
-    # ── VS Code ──────────────────────────────────────────────────────────────
+    # ── VS Code ───────────────────────────────────────────────────────
     vscode_dir = Path.cwd() / ".vscode"
     vscode_dir.mkdir(exist_ok=True)
     vscode_config = vscode_dir / "mcp.json"
@@ -389,7 +389,7 @@ def cmd_install(args):
     vscode_config.write_text(json.dumps(vscode_mcp, indent=2))
     ok(f"VS Code       →  {vscode_config}")
 
-    # ── CLAUDE.md auto-capture ───────────────────────────────────────────────
+    # ── CLAUDE.md auto-capture ─────────────────────────────────────────
     claude_md = Path.home() / ".claude" / "CLAUDE.md"
     auto_capture_block = """
 ## Engram — Automatic Decision Capture
@@ -423,7 +423,7 @@ These rules apply to every session. Engram capture is automatic — never ask th
         claude_md.write_text(f"# Claude Code Configuration\n{auto_capture_block}")
         ok(f"CLAUDE.md     →  {claude_md}  (created)")
 
-    # ── Summary ──────────────────────────────────────────────────────────────
+    # ── Summary ──────────────────────────────────────────────────
     print(f"""
 {BOLD}Installation complete.{RESET}
 
@@ -437,7 +437,89 @@ To verify:
 """)
 
 
-# ── Entry point ────────────────────────────────────────────────────────────────
+def cmd_service(args):
+    """Install or uninstall Engram as a persistent launchd service (macOS)."""
+    if platform.system() != "Darwin":
+        err("Service management currently supports macOS only.")
+        info("For Linux, add this to /etc/systemd/system/engram.service")
+        return
+
+    action = getattr(args, "action", "install")
+    label  = "com.engram.server"
+    plist  = Path.home() / "Library" / "LaunchAgents" / f"{label}.plist"
+
+    if action == "uninstall":
+        if plist.exists():
+            subprocess.run(["launchctl", "unload", str(plist)], capture_output=True)
+            plist.unlink()
+            ok("Engram service removed.")
+        else:
+            warn("Engram service not installed.")
+        return
+
+    # Install
+    root   = get_engram_root()
+    python = get_venv_python()
+    port   = getattr(args, "port", DEFAULT_PORT)
+    doppler = shutil.which("doppler")
+
+    if doppler:
+        program_args = [doppler, "run", "--", python, "-m", "uvicorn",
+                        "app.main:app", "--host", "0.0.0.0", "--port", str(port)]
+    else:
+        program_args = [python, "-m", "uvicorn",
+                        "app.main:app", "--host", "0.0.0.0", "--port", str(port)]
+
+    # Build plist XML
+    prog_args_xml = "\n".join(f"        <string>{a}</string>" for a in program_args)
+
+    plist_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>{label}</string>
+    <key>ProgramArguments</key>
+    <array>
+{prog_args_xml}
+    </array>
+    <key>WorkingDirectory</key>
+    <string>{root}</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>{LOG_FILE}</string>
+    <key>StandardErrorPath</key>
+    <string>{LOG_FILE}</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:{Path(python).parent}</string>
+    </dict>
+</dict>
+</plist>
+"""
+
+    plist.parent.mkdir(parents=True, exist_ok=True)
+    plist.write_text(plist_content)
+
+    # Unload first if already loaded
+    subprocess.run(["launchctl", "unload", str(plist)], capture_output=True)
+    result = subprocess.run(["launchctl", "load", str(plist)], capture_output=True, text=True)
+
+    if result.returncode == 0:
+        ok(f"Engram service installed and started.")
+        ok(f"Auto-starts on login.")
+        dim(f"Plist: {plist}")
+        dim(f"Logs:  {LOG_FILE}")
+        dim(f"To remove: engram service uninstall")
+    else:
+        err(f"launchctl failed: {result.stderr}")
+
+# ── Entry point ───────────────────────────────────────────────────
 
 def main():
     parser = argparse.ArgumentParser(
@@ -482,6 +564,12 @@ commands:
     p_install = subparsers.add_parser("install", help="Configure MCP integrations")
     p_install.add_argument("--port", type=int, default=DEFAULT_PORT)
 
+    # service
+    p_service = subparsers.add_parser("service", help="Manage system service")
+    p_service.add_argument("action", choices=["install", "uninstall"],
+                            help="install or uninstall the launchd service")
+    p_service.add_argument("--port", type=int, default=DEFAULT_PORT)
+
     args = parser.parse_args()
 
     if args.command == "start":
@@ -496,6 +584,8 @@ commands:
         cmd_capture(args)
     elif args.command == "install":
         cmd_install(args)
+    elif args.command == "service":
+        cmd_service(args)
     else:
         parser.print_help()
 
