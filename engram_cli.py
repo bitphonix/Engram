@@ -246,15 +246,14 @@ def cmd_search(args):
     print()
 
     try:
-        result = call_api("/context", method="POST", data={
+        result = call_api("/search", method="POST", data={
             "query":    query,
             "domain":   getattr(args, "domain", None),
             "concerns": getattr(args, "concerns", []),
         })
 
-        decisions = result.get("level1_decisions", [])
-        warnings  = result.get("level4_warnings", result.get("counterfactual_warnings", []))
-        briefing  = result.get("briefing", "")
+        decisions = result.get("decisions", [])
+        warnings  = result.get("warnings", [])
 
         if decisions:
             print(f"{BOLD}Relevant decisions ({len(decisions)}){RESET}")
@@ -270,14 +269,6 @@ def cmd_search(args):
                 cf = w.get("counterfactual", {})
                 print(f"  {RED}▲{RESET} You rejected '{cf.get('rejected_option', '')}'")
                 print(f"    {DIM}{cf.get('rejection_reason', '')[:100]}{RESET}")
-            print()
-
-        if briefing:
-            print(f"{BOLD}Briefing{RESET}")
-            # Wrap at 80 chars
-            for line in briefing.split("\n"):
-                if line.strip():
-                    print(f"  {line}")
             print()
 
         if not decisions and not warnings:

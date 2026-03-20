@@ -161,6 +161,23 @@ def get_decision(decision_id: str):
     return episode
 
 
+@app.post("/search")
+def quick_search(req: ContextRequest):
+    """
+    Fast search endpoint for CLI — skips briefing synthesis.
+    Returns Level 1 vector results + Level 4 warnings only.
+    """
+    from app.db.vector_client import semantic_search
+    from app.db.neo4j_client import surface_counterfactuals
+
+    decisions = semantic_search(req.query, limit=8, domain_filter=req.domain)
+    warnings  = surface_counterfactuals(req.concerns) if req.concerns else []
+
+    return {
+        "decisions": decisions,
+        "warnings":  warnings,
+    }
+
 @app.post("/context")
 def get_context(req: ContextRequest):
     """
