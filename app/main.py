@@ -21,6 +21,7 @@ from app.db.neo4j_client import (
     get_similar_decisions,
     get_full_episode,
     surface_counterfactuals,
+    get_graph_network,
 )
 from app.agents.retrieval import retrieve_context
 from app.agents.weight_engine import run_weight_engine, get_graph_stats, boost_retrieved_decisions
@@ -38,7 +39,7 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# ── Startup: create Neo4j constraints and indexes ─────────────────────────────
+# ── Startup ───────────────────────────────────────────────────────────────────
 @app.on_event("startup")
 def on_startup():
     try:
@@ -99,11 +100,14 @@ def graph_stats():
 
 @app.post("/graph/run-engine")
 def run_engine():
-    """
-    Manually triggers the epistemic weight engine.
-    In production this runs on a schedule — here exposed for testing.
-    """
+    """Triggers the epistemic weight engine."""
     return run_weight_engine()
+
+
+@app.get("/graph/network")
+def graph_network():
+    """Returns all Decision nodes and typed edges for D3.js visualization."""
+    return get_graph_network()
 
 
 @app.post("/ingest", response_model=IngestResponse)
@@ -111,7 +115,7 @@ def ingest(req: IngestRequest):
     """
     Main ingestion endpoint.
     Accepts raw session content, runs the LangGraph pipeline,
-    writes decisions + counterfactuals to Neo4j.
+    writes decisions + counterfactuals to Neo4j + Atlas.
     """
     if len(req.content.strip()) < 50:
         raise HTTPException(
@@ -166,17 +170,17 @@ def get_decision(decision_id: str):
 def get_context(req: ContextRequest):
     """
     4-level causal retrieval.
-    Level 1: semantic vector search → decision IDs
-    Level 2: causal ancestry → what led to similar decisions
-    Level 3: full episodes → decision + counterfactuals + outcomes
-    Level 4: counterfactual surface → rejected paths you should know about
+    Level 1: Atlas Vector Search — semantic similarity
+    Level 2: Neo4j causal ancestry — CAUSED_BY traversal
+    Level 3: Full episodes — decision + counterfactuals + outcomes
+    Level 4: Counterfactual surface — rejected paths by concern
     """
     result = retrieve_context(
         query=req.query,
         domain=req.domain,
         concerns=req.concerns,
     )
-    # Propagation signal — boost weight of retrieved decisions
+    # Propagation boost — retrieved decisions gain epistemic weight
     retrieved_ids = [d.get("id") for d in result.get("level1_decisions", []) if d.get("id")]
     if retrieved_ids:
         boost_retrieved_decisions(retrieved_ids)

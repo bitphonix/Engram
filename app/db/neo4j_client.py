@@ -152,13 +152,9 @@ def get_similar_decisions(domain: str) -> list[dict]:
 
 
 def get_causal_ancestry(decision_id: str) -> list[dict]:
-    query = """
-        MATCH (d:Decision {id: $decision_id})-[:CAUSED_BY*1..3]->(ancestor:Decision)
-        RETURN ancestor
-        LIMIT 10
-    """
     with get_driver().session() as session:
-        result = _run_with_retry(session, query, {"decision_id": decision_id})
+        result = _run_with_retry(session, CYPHER["causal_ancestry"],
+                                 {"decision_id": decision_id})
         return [dict(r["ancestor"]) for r in result]
 
 
@@ -245,3 +241,48 @@ def get_decisions_by_domain_project(domain: str, project_id: str,
                                   {"domain": domain, "project_id": project_id,
                                    "exclude_id": exclude_id})
         return [dict(r["d"]) for r in result]
+
+
+def get_graph_network() -> dict:
+    """
+    Returns all Decision nodes and typed relationships for graph visualization.
+    Used by the D3.js frontend graph view.
+    """
+    nodes_query = """
+        MATCH (d:Decision)
+        RETURN d.id AS id, d.summary AS summary, d.domain AS domain,
+               d.project_id AS project_id, d.epistemic_weight AS weight,
+               d.is_invalidated AS is_invalidated, d.chosen AS chosen,
+               d.created_at AS created_at
+        ORDER BY d.created_at ASC
+    """
+    edges_query = """
+        MATCH (a:Decision)-[r:CAUSED_BY|SUPERSEDES|SIMILAR_TO]->(b:Decision)
+        RETURN a.id AS source, b.id AS target, type(r) AS type,
+               COALESCE(r.score, 1.0) AS weight
+    """
+    with get_driver().session() as session:
+        nodes_result = _run_with_retry(session, nodes_query)
+        nodes = [
+            {
+                "id":           r["id"],
+                "summary":      r["summary"],
+                "domain":       r["domain"] or "other",
+                "project_id":   r["project_id"],
+                "weight":       r["weight"] or 0.7,
+                "is_invalidated": r["is_invalidated"] or False,
+                "chosen":       r["chosen"],
+            }
+            for r in nodes_result
+        ]
+        edges_result = _run_with_retry(session, edges_query)
+        edges = [
+            {
+                "source": r["source"],
+                "target": r["target"],
+                "type":   r["type"],
+                "weight": r["weight"],
+            }
+            for r in edges_result
+        ]
+    return {"nodes": nodes, "edges": edges}

@@ -6,6 +6,7 @@
   <title>Engram — Decision Intelligence</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,600;1,9..144,400&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     :root{
@@ -36,14 +37,15 @@
     .stat-row{display:flex;justify-content:space-between;align-items:center}
     .stat-label{font-size:10px;color:var(--muted)}
     .stat-value{font-size:11px;color:var(--orange);font-weight:500}
-    .main{flex:1;overflow-y:auto;display:flex;flex-direction:column}
-    .topbar{padding:14px 28px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg);position:sticky;top:0;z-index:10}
+    .main{flex:1;overflow:hidden;display:flex;flex-direction:column}
+    .topbar{padding:14px 28px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg);flex-shrink:0}
     .topbar-title{font-family:var(--serif);font-size:16px;color:var(--text);font-weight:500;letter-spacing:-0.01em}
     .topbar-status{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted)}
     .status-dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
-    .content{padding:24px 28px;flex:1;max-width:900px}
+    .content{padding:24px 28px;flex:1;overflow-y:auto}
+    .content.no-pad{padding:0;overflow:hidden}
     .panel{background:var(--bg2);border:1px solid var(--border2);border-radius:10px;margin-bottom:16px;overflow:hidden;box-shadow:0 1px 3px rgba(100,70,20,0.06)}
-    .panel-header{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg3)}
+    .panel-header{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg3);flex-shrink:0}
     .panel-title{font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);font-weight:500}
     .panel-body{padding:18px}
     textarea{width:100%;min-height:160px;background:var(--bg);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:12px;line-height:1.75;padding:14px 16px;resize:vertical;outline:none;transition:border-color 0.15s,box-shadow 0.15s}
@@ -89,13 +91,37 @@
     .two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px}
     .empty{padding:32px;text-align:center;color:var(--muted2);font-size:11px;letter-spacing:0.04em}
     .view{display:none}
-    .view.active{display:block}
+    .view.active{display:flex;flex-direction:column;height:100%}
+    .view.active.scrollable{overflow-y:auto;display:block}
     #ingest-result,#context-result{display:none}
     #ingest-result.visible,#context-result.visible{display:block}
-    .filter-pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+    .filter-pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:0}
     .pill{font-family:var(--mono);font-size:10px;padding:5px 12px;border-radius:20px;border:1px solid var(--border2);background:var(--bg);color:var(--muted);cursor:pointer;transition:all 0.15s;letter-spacing:0.04em}
     .pill:hover,.pill.active{border-color:var(--orange);color:var(--orange);background:var(--orange-dim);font-weight:500}
-    @media(max-width:768px){.sidebar{display:none}.two-col{grid-template-columns:1fr}}
+
+    /* ── Graph view ── */
+    .graph-layout{display:flex;height:100%;overflow:hidden}
+    .graph-canvas-wrap{flex:1;position:relative;overflow:hidden;background:var(--bg)}
+    #graph-svg{width:100%;height:100%;cursor:grab}
+    #graph-svg:active{cursor:grabbing}
+    .graph-sidebar{width:300px;flex-shrink:0;border-left:1px solid var(--border2);display:flex;flex-direction:column;background:var(--bg2);overflow:hidden}
+    .graph-sidebar-header{padding:14px 16px;border-bottom:1px solid var(--border);background:var(--bg3);flex-shrink:0}
+    .graph-sidebar-body{flex:1;overflow-y:auto;padding:14px 16px}
+    .graph-controls{position:absolute;bottom:16px;left:16px;display:flex;gap:6px;z-index:10}
+    .graph-legend{position:absolute;top:16px;left:16px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:12px 14px;z-index:10;min-width:160px}
+    .legend-title{font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+    .legend-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:10px;color:var(--text2)}
+    .legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+    .legend-line{width:24px;height:2px;flex-shrink:0;border-radius:1px}
+    .graph-tooltip{position:absolute;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--text);pointer-events:none;z-index:20;max-width:240px;line-height:1.5;box-shadow:0 4px 16px rgba(100,70,20,0.12);display:none}
+    .graph-toolbar{padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;background:var(--bg2);flex-shrink:0;flex-wrap:wrap}
+    .node-detail-title{font-family:var(--serif);font-size:14px;color:var(--text);font-weight:500;line-height:1.4;margin-bottom:10px}
+    .node-detail-field{margin-bottom:8px}
+    .node-detail-label{font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+    .node-detail-value{font-size:11px;color:var(--text2);line-height:1.5}
+    .empty-graph{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--muted2);font-size:11px;text-align:center;gap:8px}
+
+    @media(max-width:768px){.sidebar{display:none}.two-col{grid-template-columns:1fr}.graph-sidebar{display:none}}
   </style>
 </head>
 <body>
@@ -112,7 +138,7 @@
       <div class="nav-item" onclick="switchView('context',this)">
         <div class="nav-icon" style="border-radius:50%"></div>Retrieve Context
       </div>
-      <div class="nav-item" onclick="switchView('graph',this);loadDecisions('')">
+      <div class="nav-item" onclick="switchView('graph',this);loadGraph()">
         <div class="nav-icon" style="transform:rotate(45deg)"></div>Decision Graph
       </div>
     </nav>
@@ -124,282 +150,583 @@
       <div class="stat-row"><span class="stat-label">Avg weight</span><span class="stat-value" id="stat-weight">—</span></div>
     </div>
   </aside>
+
   <main class="main">
     <div class="topbar">
       <span class="topbar-title" id="view-title">Ingest Session</span>
       <div class="topbar-status"><div class="status-dot"></div><span>neo4j connected</span></div>
     </div>
-    <div class="content">
 
-      <!-- Ingest -->
-      <div class="view active" id="view-ingest">
-        <div class="panel">
-          <div class="panel-header"><span class="panel-title">Session Content</span></div>
-          <div class="panel-body">
-            <textarea id="ingest-content" placeholder="Paste an AI conversation here — Claude, ChatGPT, Gemini, Cursor, or any tool.&#10;&#10;Engram extracts atomic decisions, rejected alternatives, and their reasoning into your knowledge graph automatically."></textarea>
-            <div class="input-row">
-              <input type="text" id="ingest-project" placeholder="project-id (optional)"/>
-              <input type="text" id="ingest-tool" placeholder="tool: claude / chatgpt / gemini"/>
-              <button class="btn btn-primary" onclick="runIngest()" id="btn-ingest">Ingest →</button>
-            </div>
-          </div>
-        </div>
-        <div class="status-bar" id="ingest-status"><div class="spinner"></div><span>running extraction pipeline…</span></div>
-        <div id="ingest-result">
-          <div class="two-col" style="margin-bottom:14px">
-            <div class="panel">
-              <div class="panel-header"><span class="panel-title">Extraction Summary</span></div>
-              <div class="panel-body">
-                <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
-                  <span class="tag tag-domain" id="r-domain">—</span>
-                  <span class="tag tag-score" id="r-score">—</span>
-                </div>
-                <div style="font-size:12px;color:var(--text2);line-height:1.65" id="r-summary">—</div>
-              </div>
-            </div>
-            <div class="panel">
-              <div class="panel-header"><span class="panel-title">Graph Writes</span></div>
-              <div class="panel-body">
-                <div class="stat-row" style="margin-bottom:10px"><span class="stat-label">Decisions saved</span><span class="stat-value" id="r-decisions">—</span></div>
-                <div class="stat-row" style="margin-bottom:10px"><span class="stat-label">Counterfactuals saved</span><span class="stat-value" id="r-cfs">—</span></div>
-                <div class="stat-row" style="margin-bottom:10px"><span class="stat-label">Critique score</span><span class="stat-value" id="r-critique">—</span></div>
-                <div style="font-size:9px;color:var(--muted);margin-top:4px;word-break:break-all" id="r-session"></div>
-              </div>
-            </div>
-          </div>
-          <div id="r-error-block" style="display:none" class="panel">
-            <div class="panel-body" style="color:var(--red);font-size:12px" id="r-error"></div>
+    <!-- ── Ingest ── -->
+    <div class="view active scrollable" id="view-ingest" style="padding:24px 28px">
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Session Content</span></div>
+        <div class="panel-body">
+          <textarea id="ingest-content" placeholder="Paste an AI conversation here — Claude, ChatGPT, Gemini, Cursor, or any tool.&#10;&#10;Engram extracts atomic decisions, rejected alternatives, and their reasoning into your knowledge graph automatically."></textarea>
+          <div class="input-row">
+            <input type="text" id="ingest-project" placeholder="project-id (optional)"/>
+            <input type="text" id="ingest-tool" placeholder="tool: claude / chatgpt / gemini"/>
+            <button class="btn btn-primary" onclick="runIngest()" id="btn-ingest">Ingest →</button>
           </div>
         </div>
       </div>
-
-      <!-- Context -->
-      <div class="view" id="view-context">
-        <div class="panel">
-          <div class="panel-header"><span class="panel-title">Retrieval Query</span></div>
-          <div class="panel-body">
-            <input type="text" id="ctx-query" style="width:100%;margin-bottom:10px" placeholder="What are you about to decide? e.g. choosing a database for high-throughput writes"/>
-            <div class="input-row">
-              <input type="text" id="ctx-domain" placeholder="domain: database / architecture / auth…"/>
-              <input type="text" id="ctx-concerns" placeholder="concerns: cost, scalability, vendor_lock_in…"/>
-              <button class="btn btn-primary" onclick="runContext()" id="btn-ctx">Retrieve →</button>
+      <div class="status-bar" id="ingest-status"><div class="spinner"></div><span>running extraction pipeline…</span></div>
+      <div id="ingest-result">
+        <div class="two-col" style="margin-bottom:14px">
+          <div class="panel">
+            <div class="panel-header"><span class="panel-title">Extraction Summary</span></div>
+            <div class="panel-body">
+              <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+                <span class="tag tag-domain" id="r-domain">—</span>
+                <span class="tag tag-score" id="r-score">—</span>
+              </div>
+              <div style="font-size:12px;color:var(--text2);line-height:1.65" id="r-summary">—</div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-header"><span class="panel-title">Graph Writes</span></div>
+            <div class="panel-body">
+              <div class="stat-row" style="margin-bottom:10px"><span class="stat-label">Decisions saved</span><span class="stat-value" id="r-decisions">—</span></div>
+              <div class="stat-row" style="margin-bottom:10px"><span class="stat-label">Counterfactuals saved</span><span class="stat-value" id="r-cfs">—</span></div>
+              <div class="stat-row" style="margin-bottom:10px"><span class="stat-label">Critique score</span><span class="stat-value" id="r-critique">—</span></div>
+              <div style="font-size:9px;color:var(--muted);margin-top:4px;word-break:break-all" id="r-session"></div>
             </div>
           </div>
         </div>
-        <div class="status-bar" id="ctx-status"><div class="spinner"></div><span>running 4-level causal retrieval…</span></div>
-        <div id="context-result">
-          <div class="panel">
-            <div class="panel-header">
-              <span class="panel-title">⚠ Counterfactual Warnings</span>
-              <span style="font-size:10px;color:var(--amber);font-weight:500" id="warnings-count"></span>
-            </div>
-            <div class="panel-body" id="warnings-list"></div>
-          </div>
-          <div class="panel">
-            <div class="panel-header">
-              <span class="panel-title">Relevant Past Decisions</span>
-              <span style="font-size:10px;color:var(--muted)" id="decisions-count"></span>
-            </div>
-            <div class="panel-body" id="decisions-list"></div>
-          </div>
-          <div class="panel">
-            <div class="panel-header">
-              <span class="panel-title">Synthesized Briefing</span>
-              <button class="btn-copy" onclick="copyBriefing()">copy</button>
-            </div>
-            <div class="briefing-text" id="ctx-briefing">—</div>
+        <div id="r-error-block" style="display:none" class="panel">
+          <div class="panel-body" style="color:var(--red);font-size:12px" id="r-error"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Context ── -->
+    <div class="view scrollable" id="view-context" style="padding:24px 28px">
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Retrieval Query</span></div>
+        <div class="panel-body">
+          <input type="text" id="ctx-query" style="width:100%;margin-bottom:10px" placeholder="What are you about to decide? e.g. choosing a database for high-throughput writes"/>
+          <div class="input-row">
+            <input type="text" id="ctx-domain" placeholder="domain: database / architecture / auth…"/>
+            <input type="text" id="ctx-concerns" placeholder="concerns: cost, scalability, vendor_lock_in…"/>
+            <button class="btn btn-primary" onclick="runContext()" id="btn-ctx">Retrieve →</button>
           </div>
         </div>
       </div>
-
-      <!-- Graph -->
-      <div class="view" id="view-graph">
+      <div class="status-bar" id="ctx-status"><div class="spinner"></div><span>running 4-level causal retrieval…</span></div>
+      <div id="context-result">
         <div class="panel">
           <div class="panel-header">
-            <span class="panel-title">Decision Graph</span>
-            <div style="display:flex;gap:8px">
-              <button class="btn btn-ghost" onclick="runEngine()" style="font-size:10px;padding:5px 12px">Run weight engine</button>
-              <button class="btn btn-ghost" onclick="loadDecisions(currentDomain)" style="font-size:10px;padding:5px 12px">Refresh</button>
-            </div>
+            <span class="panel-title">⚠ Counterfactual Warnings</span>
+            <span style="font-size:10px;color:var(--amber);font-weight:500" id="warnings-count"></span>
           </div>
-          <div class="panel-body">
-            <div class="filter-pills">
-              <span class="pill active" onclick="filterDomain('',this)">All</span>
-              <span class="pill" onclick="filterDomain('database',this)">Database</span>
-              <span class="pill" onclick="filterDomain('architecture',this)">Architecture</span>
-              <span class="pill" onclick="filterDomain('authentication',this)">Auth</span>
-              <span class="pill" onclick="filterDomain('deployment',this)">Deployment</span>
-              <span class="pill" onclick="filterDomain('infrastructure',this)">Infrastructure</span>
-            </div>
-            <div id="graph-list"><div class="empty">Select a domain filter or click Refresh to load decisions.</div></div>
+          <div class="panel-body" id="warnings-list"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Relevant Past Decisions</span>
+            <span style="font-size:10px;color:var(--muted)" id="decisions-count"></span>
+          </div>
+          <div class="panel-body" id="decisions-list"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Synthesized Briefing</span>
+            <button class="btn-copy" onclick="copyBriefing()">copy</button>
+          </div>
+          <div class="briefing-text" id="ctx-briefing">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Decision Graph ── -->
+    <div class="view" id="view-graph">
+      <div class="graph-toolbar">
+        <div class="filter-pills" id="domain-pills">
+          <span class="pill active" onclick="filterGraph('',this)">All</span>
+          <span class="pill" onclick="filterGraph('database',this)">Database</span>
+          <span class="pill" onclick="filterGraph('architecture',this)">Architecture</span>
+          <span class="pill" onclick="filterGraph('authentication',this)">Auth</span>
+          <span class="pill" onclick="filterGraph('infrastructure',this)">Infrastructure</span>
+          <span class="pill" onclick="filterGraph('deployment',this)">Deployment</span>
+          <span class="pill" onclick="filterGraph('framework',this)">Framework</span>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:6px">
+          <button class="btn btn-ghost" onclick="resetZoom()" style="font-size:10px;padding:5px 12px">Reset view</button>
+          <button class="btn btn-ghost" onclick="loadGraph()" style="font-size:10px;padding:5px 12px">Refresh</button>
+          <button class="btn btn-ghost" onclick="runEngineAndRefresh()" style="font-size:10px;padding:5px 12px">Run engine</button>
+        </div>
+      </div>
+      <div class="graph-layout">
+        <div class="graph-canvas-wrap">
+          <svg id="graph-svg"></svg>
+          <div class="graph-legend">
+            <div class="legend-title">Domains</div>
+            <div class="legend-row"><div class="legend-dot" style="background:#e8650a"></div>Database</div>
+            <div class="legend-row"><div class="legend-dot" style="background:#c47a15"></div>Architecture</div>
+            <div class="legend-row"><div class="legend-dot" style="background:#d97706"></div>Auth</div>
+            <div class="legend-row"><div class="legend-dot" style="background:#92400e"></div>Infrastructure</div>
+            <div class="legend-row"><div class="legend-dot" style="background:#b45309"></div>Deployment</div>
+            <div class="legend-row"><div class="legend-dot" style="background:#78350f"></div>Framework</div>
+            <div style="margin-top:10px" class="legend-title">Edges</div>
+            <div class="legend-row"><div class="legend-line" style="background:#2d7a9a"></div>Caused by</div>
+            <div class="legend-row"><div class="legend-line" style="background:#c0392b"></div>Supersedes</div>
+            <div class="legend-row"><div class="legend-line" style="background:#2d7a4f;opacity:0.8"></div>Similar to</div>
+          </div>
+          <div class="graph-tooltip" id="graph-tooltip"></div>
+        </div>
+        <div class="graph-sidebar">
+          <div class="graph-sidebar-header">
+            <div class="panel-title">Node Detail</div>
+          </div>
+          <div class="graph-sidebar-body" id="node-detail">
+            <div class="empty" style="padding-top:40px">Click a node to inspect it</div>
           </div>
         </div>
       </div>
-
     </div>
+
   </main>
 </div>
+
 <script>
-  const API='http://localhost:8000';
-  let allDecisions=[],currentDomain='';
+const API = 'http://localhost:8000';
+let graphData = {nodes:[], edges:[]};
+let simulation, svg, zoomBehavior, activeFilter = '';
 
-  async function loadStats(){
-    try{
-      const res=await fetch(`${API}/graph/stats`);
-      const data=await res.json();
-      document.getElementById('stat-decisions').textContent=data.active_decisions??'—';
-      document.getElementById('stat-cfs').textContent=data.total_counterfactuals??'—';
-      document.getElementById('stat-sessions').textContent=data.total_sessions??'—';
-      document.getElementById('stat-weight').textContent=data.avg_epistemic_weight?data.avg_epistemic_weight.toFixed(3):'—';
-    }catch{document.getElementById('stat-decisions').textContent='offline';}
+// ── Domain colors ──────────────────────────────────────────────────────────────
+const DOMAIN_COLOR = {
+  database:       '#e8650a',
+  architecture:   '#c47a15',
+  authentication: '#d97706',
+  auth:           '#d97706',
+  infrastructure: '#92400e',
+  deployment:     '#b45309',
+  framework:      '#78350f',
+  other:          '#9a7c5a',
+};
+
+const EDGE_COLOR = {
+  CAUSED_BY:   '#2d7a9a',  
+  SUPERSEDES:  '#c0392b',   
+  SIMILAR_TO:  '#2d7a4f',   
+};
+
+function domainColor(d) { return DOMAIN_COLOR[d] || DOMAIN_COLOR.other; }
+
+// ── Stats ──────────────────────────────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const res = await fetch(`${API}/graph/stats`);
+    const data = await res.json();
+    document.getElementById('stat-decisions').textContent = data.active_decisions ?? '—';
+    document.getElementById('stat-cfs').textContent       = data.total_counterfactuals ?? '—';
+    document.getElementById('stat-sessions').textContent  = data.total_sessions ?? '—';
+    document.getElementById('stat-weight').textContent    =
+      data.avg_epistemic_weight ? data.avg_epistemic_weight.toFixed(3) : '—';
+  } catch { document.getElementById('stat-decisions').textContent = 'offline'; }
+}
+
+// ── View switching ─────────────────────────────────────────────────────────────
+function switchView(name, el) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById(`view-${name}`).classList.add('active');
+  if (el) el.classList.add('active');
+  const titles = {ingest:'Ingest Session', context:'Retrieve Context', graph:'Decision Graph'};
+  document.getElementById('view-title').textContent = titles[name];
+  if (name === 'graph') setTimeout(resizeGraph, 50);
+}
+
+// ── Ingest ─────────────────────────────────────────────────────────────────────
+async function runIngest() {
+  const content = document.getElementById('ingest-content').value.trim();
+  if (content.length < 50) { alert('Content too short.'); return; }
+  const btn = document.getElementById('btn-ingest');
+  btn.disabled = true;
+  document.getElementById('ingest-result').classList.remove('visible');
+  showStatus('ingest-status', true, 'running extraction pipeline…');
+  try {
+    const res = await fetch(`${API}/ingest`, {method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({content, tool:document.getElementById('ingest-tool').value||'unknown',
+        captured_via:'manual_paste', project_id:document.getElementById('ingest-project').value||null})});
+    const data = await res.json();
+    document.getElementById('r-domain').textContent    = data.domain_primary || '—';
+    document.getElementById('r-score').textContent     = `critique ${data.critique_score??'?'}/10`;
+    document.getElementById('r-summary').textContent   = data.session_summary || '—';
+    document.getElementById('r-decisions').textContent  = data.saved_decisions ?? 0;
+    document.getElementById('r-cfs').textContent       = data.saved_counterfactuals ?? 0;
+    document.getElementById('r-critique').textContent  = `${data.critique_score??'?'}/10`;
+    document.getElementById('r-session').textContent   = data.session_id ? `id: ${data.session_id}` : '';
+    const errBlock = document.getElementById('r-error-block');
+    if (data.error) { errBlock.style.display='block'; document.getElementById('r-error').textContent=data.error; }
+    else errBlock.style.display = 'none';
+    document.getElementById('ingest-result').classList.add('visible');
+    showStatus('ingest-status', false, data.error ? `⚠ ${data.error}` : `✓ ingested — ${data.saved_decisions} decisions, ${data.saved_counterfactuals} counterfactuals`);
+    loadStats();
+  } catch(e) { showStatus('ingest-status', false, `error: ${e.message}`); }
+  finally { btn.disabled = false; }
+}
+
+// ── Context ────────────────────────────────────────────────────────────────────
+async function runContext() {
+  const query = document.getElementById('ctx-query').value.trim();
+  if (!query) { alert('Enter a query.'); return; }
+  const btn = document.getElementById('btn-ctx');
+  btn.disabled = true;
+  document.getElementById('context-result').classList.remove('visible');
+  showStatus('ctx-status', true, 'running 4-level causal retrieval…');
+  try {
+    const concernsRaw = document.getElementById('ctx-concerns').value;
+    const concerns = concernsRaw ? concernsRaw.split(',').map(s=>s.trim()).filter(Boolean) : [];
+    const domain = document.getElementById('ctx-domain').value.trim() || null;
+    const res = await fetch(`${API}/context`, {method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({query, domain, concerns})});
+    const data = await res.json();
+    const warnings = data.level4_warnings || data.counterfactual_warnings || [];
+    const decisions = data.level1_decisions || [];
+    document.getElementById('warnings-count').textContent =
+      warnings.length ? `${warnings.length} warning${warnings.length>1?'s':''}` : 'none';
+    document.getElementById('decisions-count').textContent =
+      decisions.length ? `${decisions.length} found` : 'none';
+    const warnList = document.getElementById('warnings-list');
+    warnList.innerHTML = warnings.length
+      ? warnings.map(w => {
+          const cf = w.counterfactual || {};
+          return `<div class="cf-card"><div class="cf-header"><span class="cf-icon">⚠</span><span class="cf-option">You rejected "${esc(cf.rejected_option||'')}"</span></div><div class="cf-reason">${esc(cf.rejection_reason||'')}</div><div class="cf-meta">concern: ${cf.rejection_concern||'—'} &nbsp;·&nbsp; project: ${(w.session||{}).project_id||'—'}</div></div>`;
+        }).join('')
+      : '<div class="empty">No counterfactual warnings for these concerns.</div>';
+    const decList = document.getElementById('decisions-list');
+    decList.innerHTML = decisions.length
+      ? decisions.slice(0,5).map(d => renderDecisionCard(d)).join('')
+      : '<div class="empty">No relevant past decisions found.</div>';
+    document.getElementById('ctx-briefing').textContent = data.briefing || '—';
+    document.getElementById('context-result').classList.add('visible');
+    showStatus('ctx-status', false, `✓ ${decisions.length} decisions · ${warnings.length} warnings · ~${Math.round(data.token_estimate||0)} tokens`);
+  } catch(e) { showStatus('ctx-status', false, `error: ${e.message}`); }
+  finally { btn.disabled = false; }
+}
+
+function renderDecisionCard(d, showFull=false) {
+  const weight = d.epistemic_weight || 0.7;
+  const pct = Math.round(weight * 100);
+  const invalid = d.is_invalidated ? '<span class="tag tag-invalid">invalidated</span>' : '';
+  return `<div class="decision-card" style="--glow-opacity:${weight.toFixed(2)}">
+    <div class="decision-summary">${esc(d.summary||d.chosen||'—')}</div>
+    <div class="decision-meta">
+      <span class="tag tag-domain">${d.domain||'—'}</span>
+      ${d.project_id?`<span class="tag tag-project">${esc(d.project_id)}</span>`:''}
+      ${invalid}
+    </div>
+    <div class="weight-bar">
+      <span class="weight-label">${pct}%</span>
+      <div class="weight-track"><div class="weight-fill" style="width:${pct}%"></div></div>
+    </div></div>`;
+}
+
+// ── D3 Graph ───────────────────────────────────────────────────────────────────
+async function loadGraph() {
+  try {
+    const res = await fetch(`${API}/graph/network`);
+    graphData = await res.json();
+    renderGraph(graphData);
+  } catch(e) {
+    document.getElementById('node-detail').innerHTML =
+      `<div class="empty">Error loading graph: ${e.message}</div>`;
+  }
+}
+
+function resizeGraph() {
+  if (!graphData.nodes.length) return;
+  renderGraph(graphData);
+}
+
+function filterGraph(domain, pill) {
+  activeFilter = domain;
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  if (pill) pill.classList.add('active');
+
+  // Fade non-matching nodes
+  d3.selectAll('.graph-node')
+    .attr('opacity', d => !domain || d.domain === domain ? 1 : 0.15);
+  d3.selectAll('.graph-link')
+    .attr('opacity', d => !domain ? 0.6 :
+      (graphData.nodes.find(n=>n.id===d.source.id||n.id===d.source)?.domain === domain ? 0.8 : 0.05));
+}
+
+function resetZoom() {
+  if (!svg) return;
+  svg.transition().duration(500)
+    .call(zoomBehavior.transform, d3.zoomIdentity);
+}
+
+async function runEngineAndRefresh() {
+  await fetch(`${API}/graph/run-engine`, {method:'POST'});
+  loadStats();
+  loadGraph();
+}
+
+function renderGraph(data) {
+  const wrap = document.querySelector('.graph-canvas-wrap');
+  const W = wrap.clientWidth || 800;
+  const H = wrap.clientHeight || 600;
+
+  // Clear previous
+  d3.select('#graph-svg').selectAll('*').remove();
+
+  if (!data.nodes.length) {
+    d3.select('#graph-svg').append('foreignObject')
+      .attr('width', W).attr('height', H)
+      .append('xhtml:div')
+      .attr('class', 'empty-graph')
+      .html('<div>No decisions in graph yet</div><div style="font-size:10px">Ingest a session to get started</div>');
+    return;
   }
 
-  function switchView(name,el){
-    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-    document.getElementById(`view-${name}`).classList.add('active');
-    if(el)el.classList.add('active');
-    const titles={ingest:'Ingest Session',context:'Retrieve Context',graph:'Decision Graph'};
-    document.getElementById('view-title').textContent=titles[name];
-  }
+  svg = d3.select('#graph-svg')
+    .attr('width', W)
+    .attr('height', H);
 
-  async function runIngest(){
-    const content=document.getElementById('ingest-content').value.trim();
-    if(content.length<50){alert('Content too short.');return;}
-    const btn=document.getElementById('btn-ingest');
-    btn.disabled=true;
-    document.getElementById('ingest-result').classList.remove('visible');
-    showStatus('ingest-status',true,'running extraction pipeline…');
-    try{
-      const res=await fetch(`${API}/ingest`,{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({content,tool:document.getElementById('ingest-tool').value||'unknown',
-          captured_via:'manual_paste',project_id:document.getElementById('ingest-project').value||null})});
-      const data=await res.json();
-      document.getElementById('r-domain').textContent=data.domain_primary||'—';
-      document.getElementById('r-score').textContent=`critique ${data.critique_score??'?'}/10`;
-      document.getElementById('r-summary').textContent=data.session_summary||'—';
-      document.getElementById('r-decisions').textContent=data.saved_decisions??0;
-      document.getElementById('r-cfs').textContent=data.saved_counterfactuals??0;
-      document.getElementById('r-critique').textContent=`${data.critique_score??'?'}/10`;
-      document.getElementById('r-session').textContent=data.session_id?`id: ${data.session_id}`:'';
-      const errBlock=document.getElementById('r-error-block');
-      if(data.error){errBlock.style.display='block';document.getElementById('r-error').textContent=data.error;}
-      else errBlock.style.display='none';
-      document.getElementById('ingest-result').classList.add('visible');
-      showStatus('ingest-status',false,data.error?`⚠ ${data.error}`:`✓ ingested — ${data.saved_decisions} decisions, ${data.saved_counterfactuals} counterfactuals`);
-      loadStats();
-    }catch(e){showStatus('ingest-status',false,`error: ${e.message}`);}
-    finally{btn.disabled=false;}
-  }
+  // Arrowhead markers for each edge type
+  const defs = svg.append('defs');
+  ['CAUSED_BY','SUPERSEDES','SIMILAR_TO'].forEach(type => {
+    defs.append('marker')
+      .attr('id', `arrow-${type}`)
+      .attr('viewBox', '0 -4 8 8')
+      .attr('refX', 18).attr('refY', 0)
+      .attr('markerWidth', 6).attr('markerHeight', 6)
+      .attr('orient', 'auto')
+      .append('path')
+      .attr('d', 'M0,-4L8,0L0,4')
+      .attr('fill', EDGE_COLOR[type] || '#ccc');
+  });
 
-  async function runContext(){
-    const query=document.getElementById('ctx-query').value.trim();
-    if(!query){alert('Enter a query.');return;}
-    const btn=document.getElementById('btn-ctx');
-    btn.disabled=true;
-    document.getElementById('context-result').classList.remove('visible');
-    showStatus('ctx-status',true,'running 4-level causal retrieval…');
-    try{
-      const concernsRaw=document.getElementById('ctx-concerns').value;
-      const concerns=concernsRaw?concernsRaw.split(',').map(s=>s.trim()).filter(Boolean):[];
-      const domain=document.getElementById('ctx-domain').value.trim()||null;
-      const res=await fetch(`${API}/context`,{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({query,domain,concerns})});
-      const data=await res.json();
-      const warnings=data.level4_warnings || data.counterfactual_warnings || [];
-      const decisions=data.level1_decisions||[];
-      document.getElementById('warnings-count').textContent=warnings.length?`${warnings.length} warning${warnings.length>1?'s':''}`: 'none';
-      document.getElementById('decisions-count').textContent=decisions.length?`${decisions.length} found`:'none';
-      const warnList=document.getElementById('warnings-list');
-      warnList.innerHTML=warnings.length?warnings.map(w=>{
-        const cf=w.counterfactual||{};
-        return `<div class="cf-card"><div class="cf-header"><span class="cf-icon">⚠</span><span class="cf-option">You rejected "${esc(cf.rejected_option||'')}"</span></div><div class="cf-reason">${esc(cf.rejection_reason||'')}</div><div class="cf-meta">concern: ${cf.rejection_concern||'—'} &nbsp;·&nbsp; project: ${(w.session||{}).project_id||'—'}</div></div>`;
-      }).join(''):'<div class="empty">No counterfactual warnings for these concerns.</div>';
-      const decList=document.getElementById('decisions-list');
-      decList.innerHTML=decisions.length?decisions.slice(0,5).map(d=>renderDecisionCard(d)).join(''):'<div class="empty">No relevant past decisions found.</div>';
-      document.getElementById('ctx-briefing').textContent=data.briefing||'—';
-      document.getElementById('context-result').classList.add('visible');
-      showStatus('ctx-status',false,`✓ ${decisions.length} decisions · ${warnings.length} warnings · ~${Math.round(data.token_estimate||0)} tokens`);
-    }catch(e){showStatus('ctx-status',false,`error: ${e.message}`);}
-    finally{btn.disabled=false;}
-  }
+  // Zoom container
+  const g = svg.append('g');
+  zoomBehavior = d3.zoom()
+    .scaleExtent([0.2, 3])
+    .on('zoom', e => g.attr('transform', e.transform));
+  svg.call(zoomBehavior);
 
-  async function loadDecisions(domain){
-    currentDomain=domain||'';
-    const list=document.getElementById('graph-list');
-    list.innerHTML='<div class="empty">Loading…</div>';
-    try{
-      const d=domain||'architecture';
-      const res=await fetch(`${API}/decisions?domain=${d}`);
-      const data=await res.json();
-      allDecisions=data;
-      renderGraph(data);
-    }catch(e){list.innerHTML=`<div class="empty">error: ${e.message}</div>`;}
-  }
+  // Build id→node map for edges
+  const nodeMap = {};
+  data.nodes.forEach(n => nodeMap[n.id] = n);
 
-  function filterDomain(domain,pill){
-    currentDomain=domain;
-    document.querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
-    if(pill)pill.classList.add('active');
-    if(domain)loadDecisions(domain);
-    else{renderGraph(allDecisions.length?allDecisions:[]);if(!allDecisions.length)loadDecisions('architecture');}
-  }
+  // Filter out edges where source or target don't exist
+  const validEdges = data.edges.filter(e =>
+    nodeMap[e.source] && nodeMap[e.target] && e.source !== e.target
+  );
 
-  function renderGraph(decisions){
-    const list=document.getElementById('graph-list');
-    if(!decisions.length){list.innerHTML='<div class="empty">No decisions in this domain yet. Ingest a session first.</div>';return;}
-    list.innerHTML=decisions.map(d=>renderDecisionCard(d,true)).join('');
-  }
+  // D3 force simulation
+  simulation = d3.forceSimulation(data.nodes)
+    .force('link', d3.forceLink(validEdges)
+      .id(d => d.id)
+      .distance(d => d.type === 'SIMILAR_TO' ? 140 : 90)
+      .strength(d => d.type === 'SIMILAR_TO' ? 0.2 : 0.6))
+    .force('charge', d3.forceManyBody().strength(-220))
+    .force('center', d3.forceCenter(W/2, H/2))
+    .force('collision', d3.forceCollide().radius(d => nodeRadius(d) + 10));
 
-  function renderDecisionCard(d,showFull=false){
-    const weight=d.epistemic_weight||0.7;
-    const pct=Math.round(weight*100);
-    const invalid=d.is_invalidated?'<span class="tag tag-invalid">invalidated</span>':'';
-    const details=showFull&&d.reasoning?`<div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.65;padding-left:8px">${esc(d.reasoning)}</div>`:'';
-    return `<div class="decision-card" style="--glow-opacity:${weight.toFixed(2)}">
-      <div class="decision-summary">${esc(d.summary||d.chosen||'—')}</div>
-      <div class="decision-meta">
-        <span class="tag tag-domain">${d.domain||'—'}</span>
-        ${d.project_id?`<span class="tag tag-project">${esc(d.project_id)}</span>`:''}
-        ${invalid}
-      </div>
-      <div class="weight-bar">
+  // Draw edges
+  const link = g.append('g').selectAll('line')
+    .data(validEdges).join('line')
+    .attr('class', 'graph-link')
+    .attr('stroke', d => EDGE_COLOR[d.type] || '#ccc')
+    .attr('stroke-width', d => d.type === 'SIMILAR_TO' ? 1 : 1.5)
+    .attr('stroke-opacity', d => d.type === 'SIMILAR_TO' ? 0.35 : 0.65)
+    .attr('stroke-dasharray', d => d.type === 'SIMILAR_TO' ? '4,3' : null)
+    .attr('marker-end', d => `url(#arrow-${d.type})`);
+
+  // Draw nodes
+  const node = g.append('g').selectAll('g')
+    .data(data.nodes).join('g')
+    .attr('class', 'graph-node')
+    .attr('cursor', 'pointer')
+    .call(d3.drag()
+      .on('start', dragStart)
+      .on('drag',  dragging)
+      .on('end',   dragEnd))
+    .on('click', (e, d) => showNodeDetail(d))
+    .on('mouseenter', (e, d) => showTooltip(e, d))
+    .on('mouseleave', hideTooltip);
+
+  // Node circle
+  node.append('circle')
+    .attr('r', d => nodeRadius(d))
+    .attr('fill', d => domainColor(d.domain))
+    .attr('fill-opacity', d => d.is_invalidated ? 0.3 : 0.85)
+    .attr('stroke', d => domainColor(d.domain))
+    .attr('stroke-width', 2)
+    .attr('stroke-opacity', d => d.is_invalidated ? 0.3 : 1);
+
+  // Epistemic weight ring
+  node.append('circle')
+    .attr('r', d => nodeRadius(d) + 4)
+    .attr('fill', 'none')
+    .attr('stroke', d => domainColor(d.domain))
+    .attr('stroke-width', 1)
+    .attr('stroke-opacity', d => (d.weight || 0.7) * 0.5);
+
+  // Node label (short)
+  node.append('text')
+    .text(d => shortLabel(d))
+    .attr('text-anchor', 'middle')
+    .attr('dy', d => nodeRadius(d) + 14)
+    .attr('font-size', 9)
+    .attr('font-family', 'DM Mono, monospace')
+    .attr('fill', '#5c4f38')
+    .attr('pointer-events', 'none');
+
+  // Tick function
+  simulation.on('tick', () => {
+    link
+      .attr('x1', d => d.source.x)
+      .attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x)
+      .attr('y2', d => d.target.y);
+    node.attr('transform', d => `translate(${d.x},${d.y})`);
+  });
+
+  // Initial zoom to fit after simulation settles
+  simulation.on('end', () => fitGraph(g, W, H));
+}
+
+function nodeRadius(d) {
+  return 8 + (d.weight || 0.7) * 10;
+}
+
+function shortLabel(d) {
+  const chosen = d.chosen || '';
+  return chosen.length > 18 ? chosen.slice(0, 18) + '…' : chosen;
+}
+
+function fitGraph(g, W, H) {
+  const bounds = g.node().getBBox();
+  if (!bounds.width || !bounds.height) return;
+  const scale = 0.85 / Math.max(bounds.width/W, bounds.height/H);
+  const tx = W/2 - scale * (bounds.x + bounds.width/2);
+  const ty = H/2 - scale * (bounds.y + bounds.height/2);
+  svg.transition().duration(600)
+    .call(zoomBehavior.transform, d3.zoomIdentity.translate(tx,ty).scale(scale));
+}
+
+function dragStart(e, d) {
+  if (!e.active) simulation.alphaTarget(0.3).restart();
+  d.fx = d.x; d.fy = d.y;
+}
+function dragging(e, d) { d.fx = e.x; d.fy = e.y; }
+function dragEnd(e, d) {
+  if (!e.active) simulation.alphaTarget(0);
+  d.fx = null; d.fy = null;
+}
+
+function showTooltip(e, d) {
+  const tip = document.getElementById('graph-tooltip');
+  tip.style.display = 'block';
+  tip.innerHTML = `<strong>${esc(d.chosen||'')}</strong><br><span style="color:#9c8c72;font-size:10px">${d.domain||''} · ${d.project_id||''}</span><br><span style="font-size:10px">${esc((d.summary||'').slice(0,100))}…</span>`;
+  moveTip(e);
+  document.getElementById('graph-svg').addEventListener('mousemove', moveTipE);
+}
+function moveTipE(e) { moveTip(e); }
+function moveTip(e) {
+  const tip = document.getElementById('graph-tooltip');
+  const wrap = document.querySelector('.graph-canvas-wrap');
+  const rect = wrap.getBoundingClientRect();
+  let x = e.clientX - rect.left + 14;
+  let y = e.clientY - rect.top - 10;
+  if (x + 250 > wrap.clientWidth) x -= 260;
+  tip.style.left = x + 'px';
+  tip.style.top  = y + 'px';
+}
+function hideTooltip() {
+  document.getElementById('graph-tooltip').style.display = 'none';
+  document.getElementById('graph-svg').removeEventListener('mousemove', moveTipE);
+}
+
+function showNodeDetail(d) {
+  const pct = Math.round((d.weight || 0.7) * 100);
+  document.getElementById('node-detail').innerHTML = `
+    <div class="node-detail-title">${esc(d.summary||'')}</div>
+    <div class="node-detail-field">
+      <div class="node-detail-label">Chosen</div>
+      <div class="node-detail-value">${esc(d.chosen||'—')}</div>
+    </div>
+    <div class="node-detail-field">
+      <div class="node-detail-label">Domain</div>
+      <div class="node-detail-value" style="color:${domainColor(d.domain)}">${d.domain||'—'}</div>
+    </div>
+    <div class="node-detail-field">
+      <div class="node-detail-label">Project</div>
+      <div class="node-detail-value">${d.project_id||'—'}</div>
+    </div>
+    <div class="node-detail-field">
+      <div class="node-detail-label">Epistemic Weight</div>
+      <div class="weight-bar" style="padding-left:0;margin-top:4px">
         <span class="weight-label">${pct}%</span>
         <div class="weight-track"><div class="weight-fill" style="width:${pct}%"></div></div>
-      </div>${details}</div>`;
+      </div>
+    </div>
+    ${d.is_invalidated ? '<div class="tag tag-invalid" style="margin-top:8px">Superseded / Invalidated</div>' : ''}
+    <div style="margin-top:12px">
+      <button class="btn btn-ghost" style="font-size:10px;padding:5px 12px;width:100%"
+        onclick="loadFullEpisode('${d.id}')">Load full episode →</button>
+    </div>
+    <div id="episode-detail" style="margin-top:12px"></div>
+  `;
+}
+
+async function loadFullEpisode(id) {
+  const el = document.getElementById('episode-detail');
+  el.innerHTML = '<div style="font-size:10px;color:var(--muted)">Loading…</div>';
+  try {
+    const res = await fetch(`${API}/decisions/${id}`);
+    const data = await res.json();
+    const cfs = data.counterfactuals || [];
+    el.innerHTML = `
+      <div class="node-detail-label" style="margin-bottom:6px">Reasoning</div>
+      <div class="node-detail-value" style="margin-bottom:12px">${esc(data.decision?.reasoning||'—')}</div>
+      ${cfs.length ? `
+        <div class="node-detail-label" style="margin-bottom:6px">Rejected alternatives (${cfs.length})</div>
+        ${cfs.map(cf=>`
+          <div style="background:var(--amber-dim);border:1px solid rgba(196,122,21,0.2);border-radius:6px;padding:8px 10px;margin-bottom:6px;font-size:10px">
+            <strong style="color:var(--amber)">${esc(cf.rejected_option||'')}</strong><br>
+            <span style="color:var(--text2)">${esc(cf.rejection_reason||'')}</span>
+          </div>
+        `).join('')}
+      ` : ''}
+    `;
+  } catch(e) { el.innerHTML = `<div style="color:var(--red);font-size:10px">Error: ${e.message}</div>`; }
+}
+
+// ── Utilities ──────────────────────────────────────────────────────────────────
+function showStatus(id, loading, text) {
+  const bar = document.getElementById(id);
+  bar.classList.add('visible');
+  const spinner = bar.querySelector('.spinner');
+  const span = bar.querySelector('span');
+  if (spinner) spinner.style.display = loading ? 'block' : 'none';
+  if (span && text) span.textContent = text;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function copyBriefing() {
+  const text = document.getElementById('ctx-briefing').textContent;
+  await navigator.clipboard.writeText(text);
+  const btn = document.querySelector('.btn-copy');
+  btn.textContent = 'Copied!';
+  setTimeout(() => btn.textContent = 'copy', 1500);
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+loadStats();
+setInterval(loadStats, 30000);
+window.addEventListener('resize', () => {
+  if (document.getElementById('view-graph').classList.contains('active')) {
+    resizeGraph();
   }
-
-  async function runEngine(){
-    try{
-      const res=await fetch(`${API}/graph/run-engine`,{method:'POST'});
-      const data=await res.json();
-      loadStats();
-      if(currentDomain!==undefined)loadDecisions(currentDomain);
-      alert(`Weight engine ran:\n• Decayed: ${data.decayed??0}\n• Overrides: ${data.overrides??0}\n• Contradictions: ${data.contradictions??0}`);
-    }catch(e){alert(`Engine error: ${e.message}`);}
-  }
-
-  function showStatus(id,loading,text){
-    const bar=document.getElementById(id);
-    bar.classList.add('visible');
-    const spinner=bar.querySelector('.spinner');
-    const span=bar.querySelector('span');
-    if(spinner)spinner.style.display=loading?'block':'none';
-    if(span&&text)span.textContent=text;
-  }
-
-  function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-
-  async function copyBriefing(){
-    const text=document.getElementById('ctx-briefing').textContent;
-    await navigator.clipboard.writeText(text);
-    const btn=document.querySelector('.btn-copy');
-    btn.textContent='Copied!';
-    setTimeout(()=>btn.textContent='copy',1500);
-  }
-
-  loadStats();
-  setInterval(loadStats,30000);
+});
 </script>
 </body>
 </html>
