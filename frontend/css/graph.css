@@ -1,0 +1,280 @@
+/* ============================================
+   ENGRAM — Graph Styles
+   Nodes, Edges, Legend, Filter Pills
+   ============================================ */
+
+/* Filter Pills */
+.filter-pills {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  z-index: 2;
+  max-width: calc(100% - 200px);
+}
+
+.pill {
+  height: 28px;
+  padding: 0 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6875rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 200ms var(--ease-out);
+  text-transform: lowercase;
+}
+
+.pill:hover {
+  border-color: var(--border-medium);
+  color: var(--text-primary);
+}
+
+.pill.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg-primary);
+  font-weight: 500;
+}
+
+/* Graph Toolbar */
+.graph-toolbar {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  gap: 8px;
+  z-index: 2;
+}
+
+.toolbar-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 150ms var(--ease-out);
+}
+
+.toolbar-btn:hover {
+  background: var(--bg-secondary);
+  border-color: var(--border-medium);
+  color: var(--text-primary);
+}
+
+/* Legend */
+.legend {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  background: var(--bg-panel);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 12px 16px;
+  z-index: 2;
+  min-width: 140px;
+}
+
+.legend-title {
+  font-size: 0.625rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.legend-item:last-child {
+  margin-bottom: 0;
+}
+
+.legend-line {
+  width: 24px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+.legend-line.caused-by {
+  background: var(--edge-caused);
+  animation: edge-flow 1.5s linear infinite;
+  background-image: linear-gradient(90deg, var(--edge-caused) 50%, transparent 50%);
+  background-size: 8px 2px;
+}
+
+.legend-line.supersedes {
+  background: var(--edge-supersedes);
+}
+
+.legend-line.similar-to {
+  background: var(--edge-similar);
+  background-image: repeating-linear-gradient(90deg, var(--edge-similar) 0, var(--edge-similar) 4px, transparent 4px, transparent 8px);
+}
+
+/* Graph Nodes */
+.graph-node {
+  cursor: pointer;
+  transition: opacity 300ms var(--ease-out);
+}
+
+.graph-node circle.node-glow-outer {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  opacity: 0.2;
+  animation: node-pulse 3s ease-in-out infinite;
+}
+
+.graph-node circle.node-glow-inner {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  opacity: 0.4;
+}
+
+.graph-node circle.node-core {
+  fill: currentColor;
+  fill-opacity: 0.85;
+  stroke: var(--bg-primary);
+  stroke-width: 2;
+  transition: all 200ms var(--ease-out);
+}
+
+.graph-node:hover circle.node-core {
+  fill-opacity: 1;
+  stroke-width: 2.5;
+  filter: brightness(1.3);
+}
+
+.graph-node.invalidated circle.node-core {
+  fill-opacity: 0.1;
+  stroke-dasharray: 4 2;
+  opacity: 0.4;
+}
+
+.graph-node.dimmed {
+  opacity: 0.15;
+}
+
+.graph-node.highlighted {
+  opacity: 1;
+}
+
+.graph-node.highlighted circle.node-core {
+  filter: brightness(1.5);
+  animation: node-flash 0.6s var(--ease-out);
+}
+
+@keyframes node-pulse {
+  0%, 100% { r: calc(var(--node-radius) * 1.8); opacity: 0.15; }
+  50% { r: calc(var(--node-radius) * 2.2); opacity: 0.3; }
+}
+
+@keyframes node-flash {
+  0% { filter: brightness(1); }
+  50% { filter: brightness(2.5); }
+  100% { filter: brightness(1); }
+}
+
+.node-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  fill: var(--text-primary);
+  fill-opacity: 1;
+  text-anchor: middle;
+  pointer-events: none;
+  transition: opacity 200ms var(--ease-out);
+  stroke: var(--bg-primary);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  paint-order: stroke fill;
+}
+
+/* Graph Edges */
+.graph-edge {
+  fill: none;
+  transition: all 200ms var(--ease-out);
+  pointer-events: stroke;
+}
+
+.graph-edge.caused-by {
+  stroke: var(--edge-caused);
+  stroke-width: 1.5;
+  stroke-dasharray: 8 4;
+  animation: edge-flow 1.5s linear infinite;
+}
+
+.graph-edge.supersedes {
+  stroke: var(--edge-supersedes);
+  stroke-width: 1.5;
+}
+
+.graph-edge.similar-to {
+  stroke: var(--edge-similar);
+  stroke-width: 0.8;
+  stroke-dasharray: 4 4;
+  opacity: 0.4;
+}
+
+.graph-edge:hover {
+  stroke-width: 3;
+  filter: brightness(1.3);
+}
+
+@keyframes edge-flow {
+  to { stroke-dashoffset: -24; }
+}
+
+/* Arrow markers */
+#arrow-caused-by, #arrow-supersedes, #arrow-similar-to {
+  fill: currentColor;
+}
+
+/* Tooltip */
+.tooltip {
+  position: fixed;
+  pointer-events: none;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-medium);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  z-index: 500;
+  opacity: 0;
+  transition: opacity 150ms var(--ease-out);
+  max-width: 280px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.tooltip.visible {
+  opacity: 1;
+}
+
+.tooltip-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--accent);
+}
+
+.tooltip-meta {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
