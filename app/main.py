@@ -7,6 +7,8 @@ try:
 except ImportError:
     pass
 
+from dotenv import load_dotenv
+load_dotenv()
 import sentry_sdk
 import os
 from fastapi import FastAPI, HTTPException
@@ -36,6 +38,15 @@ app = FastAPI(
     title="Engram",
     description="Developer decision intelligence — causal memory across AI sessions",
     version="0.1.0",
+)
+
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["POST", "GET", "DELETE"],
+    allow_headers=["Content-Type"],
 )
 
 @app.on_event("startup")

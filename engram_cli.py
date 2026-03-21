@@ -436,6 +436,21 @@ These rules apply to every session. Engram capture is automatic — never ask th
         claude_md.write_text(f"# Claude Code Configuration\n{auto_capture_block}")
         ok(f"CLAUDE.md     →  {claude_md}  (created)")
 
+
+    # ── Bookmarklet ──────────────────────────────────────────────────────────────
+    bookmarklet = (
+        f"javascript:(function(){{fetch('http://localhost:{port}/ingest',"
+        f"{{method:'POST',headers:{{'Content-Type':'application/json'}},"
+        f"body:JSON.stringify({{content:document.body.innerText.slice(0,50000),"
+        f"tool:'web',captured_via:'bookmarklet'}})}}).then(r=>r.json())"
+        f".then(d=>alert('Engram: '+d.saved_decisions+' decisions saved'))"
+        f".catch(e=>alert('Engram: '+e.message))}})();"
+    )
+    print(f"\n{BOLD}Browser bookmarklet:{RESET}")
+    print(f"  Drag to bookmarks bar to capture from Claude.ai, ChatGPT, Gemini:")
+    dim(f"  {bookmarklet[:80]}…")
+    info(f"  Or visit http://localhost:{port} → Browser Capture tab")
+
     # ── Summary ──────────────────────────────────────────────────
     print(f"""
 {BOLD}Installation complete.{RESET}

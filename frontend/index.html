@@ -141,6 +141,9 @@
       <div class="nav-item" onclick="switchView('graph',this);loadGraph()">
         <div class="nav-icon" style="transform:rotate(45deg)"></div>Decision Graph
       </div>
+      <div class="nav-item" onclick="switchView('bookmarklet',this)">
+        <div class="nav-icon" style="border-radius:50%"></div>Browser Capture
+      </div>
     </nav>
     <div class="stats-block">
       <div class="stats-title">Knowledge Graph</div>
@@ -268,9 +271,9 @@
             <div class="legend-row"><div class="legend-dot" style="background:#b45309"></div>Deployment</div>
             <div class="legend-row"><div class="legend-dot" style="background:#78350f"></div>Framework</div>
             <div style="margin-top:10px" class="legend-title">Edges</div>
-            <div class="legend-row"><div class="legend-line" style="background:#2d7a9a"></div>Caused by</div>
-            <div class="legend-row"><div class="legend-line" style="background:#c0392b"></div>Supersedes</div>
-            <div class="legend-row"><div class="legend-line" style="background:#2d7a4f;opacity:0.8"></div>Similar to</div>
+            <div class="legend-row"><div class="legend-line" style="background:#e8650a"></div>Caused by</div>
+            <div class="legend-row"><div class="legend-line" style="background:#ef4444"></div>Supersedes</div>
+            <div class="legend-row"><div class="legend-line" style="background:#c47a15;opacity:0.6"></div>Similar to</div>
           </div>
           <div class="graph-tooltip" id="graph-tooltip"></div>
         </div>
@@ -285,6 +288,38 @@
       </div>
     </div>
 
+      <!-- ── Browser Capture ── -->
+      <div class="view scrollable" id="view-bookmarklet" style="padding:24px 28px">
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Browser Bookmarklet</span></div>
+          <div class="panel-body">
+            <p style="font-size:12px;color:var(--text2);margin-bottom:20px;line-height:1.75">
+              Capture any AI conversation from Claude.ai, ChatGPT, or Gemini with one click.
+              Drag the button below to your bookmarks bar — then click it on any AI page to capture.
+            </p>
+            <div style="margin-bottom:24px">
+              <a id="bookmarklet-link" href="#"
+                 style="display:inline-block;background:var(--orange);color:#fff;font-family:var(--mono);font-size:12px;font-weight:500;padding:11px 22px;border-radius:6px;text-decoration:none;cursor:grab;box-shadow:0 2px 8px rgba(232,101,10,0.3)"
+                 onclick="event.preventDefault();alert('Drag this button to your bookmarks bar — do not click it here.')">
+                📎 Capture to Engram
+              </a>
+              <p style="font-size:10px;color:var(--muted);margin-top:8px">← drag this to your bookmarks bar</p>
+            </div>
+            <div style="font-size:12px;color:var(--text2);line-height:1.9;margin-bottom:16px">
+              <strong style="color:var(--text);display:block;margin-bottom:6px">How to use:</strong>
+              1. Drag the orange button above to your browser bookmarks bar<br>
+              2. Open any AI conversation in Claude.ai, ChatGPT, or Gemini<br>
+              3. Click the bookmark — Engram captures the page and extracts decisions<br>
+              4. A popup confirms how many decisions and counterfactuals were saved
+            </div>
+            <div style="padding:14px 16px;background:var(--amber-dim);border:1px solid rgba(196,122,21,0.25);border-radius:8px;font-size:11px;color:var(--text2);line-height:1.6">
+              ⚠ Engram server must be running for the bookmarklet to work.<br>
+              Run <code style="font-family:var(--mono);background:var(--bg3);padding:2px 6px;border-radius:3px">engram status</code> to verify.
+            </div>
+          </div>
+        </div>
+      </div>
+
   </main>
 </div>
 
@@ -292,22 +327,6 @@
 const API = 'http://localhost:8000';
 let graphData = {nodes:[], edges:[]};
 let simulation, svg, zoomBehavior, activeFilter = '';
-async function deleteDecision(id) {
-  if (!confirm('Permanently delete this decision and its counterfactuals?')) return;
-  try {
-    const res = await fetch(`${API}/decisions/${id}`, {method: 'DELETE'});
-    if (res.ok) {
-      document.getElementById('node-detail').innerHTML =
-        '<div class="empty" style="padding-top:40px;color:var(--green)">✓ Decision deleted</div>';
-      loadGraph(); // Refresh the graph
-      loadStats();
-    } else {
-      alert('Delete failed.');
-    }
-  } catch(e) {
-    alert(`Error: ${e.message}`);
-  }
-}
 
 // ── Domain colors ──────────────────────────────────────────────────────────────
 const DOMAIN_COLOR = {
@@ -322,9 +341,9 @@ const DOMAIN_COLOR = {
 };
 
 const EDGE_COLOR = {
-  CAUSED_BY:   '#2d7a9a',  
-  SUPERSEDES:  '#c0392b',   
-  SIMILAR_TO:  '#2d7a4f',   
+  CAUSED_BY:   '#e8650a',
+  SUPERSEDES:  '#ef4444',
+  SIMILAR_TO:  '#c47a15',
 };
 
 function domainColor(d) { return DOMAIN_COLOR[d] || DOMAIN_COLOR.other; }
@@ -348,7 +367,7 @@ function switchView(name, el) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById(`view-${name}`).classList.add('active');
   if (el) el.classList.add('active');
-  const titles = {ingest:'Ingest Session', context:'Retrieve Context', graph:'Decision Graph'};
+  const titles = {ingest:'Ingest Session', context:'Retrieve Context', graph:'Decision Graph', bookmarklet:'Browser Capture'};
   document.getElementById('view-title').textContent = titles[name];
   if (name === 'graph') setTimeout(resizeGraph, 50);
 }
@@ -685,8 +704,6 @@ function showNodeDetail(d) {
     <div style="margin-top:12px">
       <button class="btn btn-ghost" style="font-size:10px;padding:5px 12px;width:100%"
         onclick="loadFullEpisode('${d.id}')">Load full episode →</button>
-      <button class="btn btn-ghost" style="font-size:10px;padding:5px 12px;width:100%;margin-top:6px;border-color:var(--red);color:var(--red)"
-        onclick="deleteDecision('${d.id}')">Delete decision</button>
     </div>
     <div id="episode-detail" style="margin-top:12px"></div>
   `;
@@ -738,6 +755,12 @@ async function copyBriefing() {
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────────
+// Set bookmarklet href dynamically
+const _port = window.location.port || 8000;
+const _bm = `javascript:(function(){fetch('http://localhost:${_port}/ingest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:document.body.innerText.slice(0,50000),tool:'web',captured_via:'bookmarklet'})}).then(r=>r.json()).then(d=>alert('Engram: '+d.saved_decisions+' decisions saved, '+d.saved_counterfactuals+' counterfactuals')).catch(e=>alert('Engram: '+e.message))})()`;
+const _bl = document.getElementById('bookmarklet-link');
+if (_bl) _bl.href = _bm;
+
 loadStats();
 setInterval(loadStats, 30000);
 window.addEventListener('resize', () => {

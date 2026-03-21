@@ -13,3 +13,4 @@ pytest-cov==5.0.0
 httpx==0.28.1
 pymongo[srv]==4.8.0
 chromadb>=0.5.23
+python-dotenv>=1.2.2
