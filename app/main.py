@@ -130,17 +130,27 @@ def ingest(req: IngestRequest):
         "saved_counterfact_ids": [],
     }
 
-    result = pipeline.invoke(initial_state)
-
-    return IngestResponse(
-        session_id=            result.get("session_id"),
-        saved_decisions=       len(result.get("saved_decision_ids", [])),
-        saved_counterfactuals= len(result.get("saved_counterfact_ids", [])),
-        is_high_signal=        result.get("is_high_signal", True),
-        session_summary=       result.get("session_summary"),
-        domain_primary=        result.get("domain_primary"),
-        critique_score=        result.get("critique_score"),
-        error=                 result.get("error"),
+    try:
+        result = pipeline.invoke(initial_state)
+    except Exception as e:
+        # Pipeline failed — save to local queue for retry
+        from app.queue import enqueue_failed
+        path = enqueue_failed(
+            content=      req.content,
+            tool=         req.tool,
+            captured_via= req.captured_via,
+            project_id=   req.project_id,
+            error=        str(e),
+        )
+        return IngestResponse(
+            session_id=            None,
+            saved_decisions=       0,
+            saved_counterfactuals= 0,
+            is_high_signal=        True,
+            session_summary=       None,
+            domain_primary=        None,
+            critique_score=        None,
+            error=f"queued for retry: {str(e)[:100]}",
     )
 
 

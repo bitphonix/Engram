@@ -178,6 +178,13 @@ def cmd_start(args):
             ok(f"Engram is running  →  http://localhost:{port}")
             ok(f"Open dashboard     →  http://localhost:{port}")
             dim(f"Logs: {LOG_FILE}")
+            from pathlib import Path as _P
+            import sys as _sys
+            _sys.path.insert(0, str(get_engram_root()))
+            from app.queue import queue_size
+            qs = queue_size()
+            if qs > 0:
+                warn(f"{qs} item(s) in retry queue — run: engram retry")
             return
         except Exception:
             pass
@@ -510,6 +517,64 @@ def cmd_service(args):
     else:
         err(f"launchctl failed: {result.stderr}")
 
+def cmd_retry(args):
+    """Retry all failed ingests from the local queue."""
+    import sys
+    sys.path.insert(0, str(get_engram_root()))
+    from app.queue import get_queue, remove_from_queue, queue_size
+
+    if not is_server_running():
+        err("Server not running. Run: engram start")
+        return
+
+    size = queue_size()
+    if size == 0:
+        ok("Queue is empty — nothing to retry.")
+        return
+
+    info(f"Retrying {size} queued ingest(s)…\n")
+
+    items     = get_queue()
+    succeeded = 0
+    failed    = 0
+
+    for item in items:
+        path = item.pop("_path")
+        info(f"Retrying: {item.get('project_id','unknown')} "
+             f"({item.get('tool','?')}) — attempt {item.get('attempts',1)+1}")
+        try:
+            result = call_api("/ingest", method="POST", data={
+                "content":      item["content"],
+                "tool":         item.get("tool", "unknown"),
+                "captured_via": item.get("captured_via", "queue_retry"),
+                "project_id":   item.get("project_id"),
+            })
+            if result.get("error") and "queued" not in result.get("error", ""):
+                raise Exception(result["error"])
+
+            remove_from_queue(path)
+            ok(f"  ✓ saved {result.get('saved_decisions',0)} decisions")
+            succeeded += 1
+
+        except Exception as e:
+            # Update attempt count
+            item["attempts"] = item.get("attempts", 1) + 1
+            item["error"]    = str(e)
+            if item["attempts"] >= 5:
+                err(f"  ✗ max retries reached — dropping item")
+                remove_from_queue(path)
+            else:
+                from pathlib import Path as P
+                import json
+                P(path).write_text(json.dumps(item, indent=2))
+                warn(f"  ✗ still failing ({item['attempts']}/5 attempts)")
+            failed += 1
+
+    print()
+    ok(f"Retry complete: {succeeded} succeeded, {failed} still failing")
+    if failed:
+        warn(f"Run 'engram retry' again when the issue is resolved.")
+
 # ── Entry point ───────────────────────────────────────────────────
 
 def main():
@@ -555,6 +620,9 @@ commands:
     p_install = subparsers.add_parser("install", help="Configure MCP integrations")
     p_install.add_argument("--port", type=int, default=DEFAULT_PORT)
 
+    # retry
+    subparsers.add_parser("retry", help="Retry failed ingests from queue")
+
     # service
     p_service = subparsers.add_parser("service", help="Manage system service")
     p_service.add_argument("action", choices=["install", "uninstall"],
@@ -577,6 +645,8 @@ commands:
         cmd_install(args)
     elif args.command == "service":
         cmd_service(args)
+    elif args.command == "retry":
+        cmd_retry(args)
     else:
         parser.print_help()
 
