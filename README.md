@@ -15,16 +15,15 @@ Every technical decision you make with AI tools. Every rejected alternative. Eve
 [![LangGraph](https://img.shields.io/badge/agents-langgraph-a78bfa?style=flat-square)](https://langchain-ai.github.io/langgraph/)
 [![Neo4j](https://img.shields.io/badge/graph-neo4j_auradb-34d399?style=flat-square)](https://neo4j.com/cloud/aura)
 
-[**Live Demo**](https://engram-xxxxx.ondigitalocean.app) · [**Setup Guide**](SETUP.md) · [**Report Bug**](https://github.com/bitphonix/Engram/issues)
+[**Setup Guide**](SETUP.md) · [**Report Bug**](https://github.com/bitphonix/Engram/issues) · [**LinkedIn**](https://linkedin.com/in/tanishk-soni-a94077239)
 
 </div>
 
 ---
 
-> **Demo** — add a GIF here once recorded. Run `asciinema rec` or QuickTime to capture:
-> `engram install` → ingest a session → `engram search` → open dashboard graph
-> Drop the file at `assets/demo.gif` and replace this line with:
-> `![Engram Demo](assets/demo.gif)`
+> Built with LangGraph · Neo4j AuraDB · ChromaDB · Google Gemini 2.5 · FastAPI
+>
+> MCP integration with Claude Code · Cursor · VS Code — one command setup
 
 ---
 
