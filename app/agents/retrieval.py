@@ -220,25 +220,30 @@ def synthesize_briefing(
         warnings_text = "\n".join(lines)
 
     prompt = f"""You are injecting historical decision context into a developer's AI session.
-They are about to make a decision. Build a concise context briefing (max 400 words).
 
-THEIR CURRENT QUESTION: {query}
+CURRENT QUESTION: {query}
 
-PAST DECISIONS FROM THEIR HISTORY:
-{past_decisions_text or "No relevant past decisions found."}
+PAST DECISIONS:
+{past_decisions_text or "None."}
 
-FULL DECISION EPISODES:
-{episodes_text or "No episodes available."}
+FULL EPISODES:
+{episodes_text or "None."}
 
-COUNTERFACTUAL WARNINGS (paths they rejected before):
-{warnings_text or "No warnings."}
+COUNTERFACTUAL WARNINGS:
+{warnings_text or "None."}
 
-Write a briefing in this format:
-1. RELEVANT HISTORY: (2-3 sentences about what they've decided before in this domain)
-2. WARNINGS: (any counterfactual warnings — "You rejected X before because Y")
-3. RECOMMENDATION: (one sentence based on their pattern of decisions)
+Write EXACTLY this structure — no markdown, no bold, no extra sections:
 
-Be direct. No preamble. Write as if you know their entire decision history.
+PAST DECISIONS: [2-3 sentences about relevant past choices. If none, write "No relevant past decisions found."]
+WARNINGS: [One line per warning starting with "- You rejected X because Y." If none, write "None."]
+RECOMMENDATION: [One sentence starting with "Based on your history,"]
+
+Rules:
+- No markdown formatting, no ** bold **, no headers with #
+- No numbered lists
+- Exactly 3 lines starting with PAST DECISIONS:, WARNINGS:, RECOMMENDATION:
+- Max 150 words total
+- Do not add any text before or after these 3 lines
 """
     try:
         response = _flash.invoke(prompt)
