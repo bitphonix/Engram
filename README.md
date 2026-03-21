@@ -1,29 +1,38 @@
+<div align="center">
+
+<img src="assets/engram-banner.png" alt="Engram" width="100%"/>
+
 # Engram
 
 **Developer decision intelligence — causal memory across AI sessions.**
 
-Most AI memory tools store *what happened*. Engram stores *what was decided, what was rejected, and why* — building a living knowledge graph of your technical judgment that grows smarter every session.
+Every technical decision you make with AI tools. Every rejected alternative. Every reason why. Remembered permanently, retrieved semantically, visualized as a living knowledge graph.
 
-```bash
-pip install -e .
-engram install   # configure Claude Code, Cursor, VS Code in one command
-engram start     # run as background daemon, auto-starts on login
-engram search "database for high throughput writes"
-```
+[![CI](https://github.com/bitphonix/Engram/actions/workflows/ci.yml/badge.svg)](https://github.com/bitphonix/Engram/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-64%20passing-10b981?style=flat-square)](https://github.com/bitphonix/Engram/actions)
+[![Python](https://img.shields.io/badge/python-3.11-3b82f6?style=flat-square)](https://python.org)
+[![License](https://img.shields.io/badge/license-MIT-f97316?style=flat-square)](LICENSE)
+[![LangGraph](https://img.shields.io/badge/agents-langgraph-a78bfa?style=flat-square)](https://langchain-ai.github.io/langgraph/)
+[![Neo4j](https://img.shields.io/badge/graph-neo4j_auradb-34d399?style=flat-square)](https://neo4j.com/cloud/aura)
 
-> Built with LangGraph · Neo4j · ChromaDB · Google Gemini
+[**Live Demo**](https://engram-xxxxx.ondigitalocean.app) · [**Setup Guide**](SETUP.md) · [**Report Bug**](https://github.com/bitphonix/Engram/issues)
 
-[![CI](https://github.com/YOUR_USERNAME/engram/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/engram/actions)
-[![Tests](https://img.shields.io/badge/tests-64%20passing-2d7a4f)](https://github.com/YOUR_USERNAME/engram/actions)
-[![Python](https://img.shields.io/badge/python-3.11-e8650a)](https://python.org)
+</div>
+
+---
+
+> **Demo** — add a GIF here once recorded. Run `asciinema rec` or QuickTime to capture:
+> `engram install` → ingest a session → `engram search` → open dashboard graph
+> Drop the file at `assets/demo.gif` and replace this line with:
+> `![Engram Demo](assets/demo.gif)`
 
 ---
 
 ## The problem
 
-Every AI session ends with lost context. You close the chat and the decisions, the dead ends, the reasoning behind every choice — evaporate. You open a new session tomorrow and start over.
+Every AI coding session ends with lost context. You close the chat — the decisions, the dead ends, the reasoning behind every choice — evaporate. Tomorrow you start over.
 
-Existing solutions only solve half the problem:
+Existing tools store *what happened*. Engram stores *what you decided, what you rejected, and why*:
 
 | Tool | What it stores | What it misses |
 |---|---|---|
@@ -31,57 +40,56 @@ Existing solutions only solve half the problem:
 | mem0 | Facts and preferences | The *why* behind decisions, counterfactuals |
 | Chat history | Everything | Signal in the noise, cross-session intelligence |
 
-**Engram stores what no other system does: the roads not taken.**
-
-When you chose PostgreSQL over MongoDB, the *rejection* contains more information than the choice. The concern that drove it, the reasoning, the constraints — that's the intelligence that should survive session boundaries.
+**The insight:** When you chose PostgreSQL over MongoDB, the *rejection* carries more information than the choice. The concern that drove it, the constraints, the reasoning — that's the engineering judgment that should survive session boundaries. Engram stores what no other system does: **the roads not taken.**
 
 ---
 
 ## Quickstart
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/engram
-cd engram
+git clone https://github.com/bitphonix/Engram
+cd Engram
 python -m venv venv && source venv/bin/activate
 pip install -e .
 
-# Set secrets (Neo4j AuraDB + Gemini API key)
-doppler setup   # or copy .env.example to .env
+# Copy and fill in your secrets (see SETUP.md for step-by-step)
+cp .env.example .env
 
-# One-time setup
-engram install  # wires up Claude Code, Cursor, VS Code + auto-capture
-engram start    # starts server + installs launchd service (auto-starts on login)
+# One-command setup — wires up Claude Code, Cursor, VS Code + auto-capture
+engram install
+
+# Start server (persists across reboots via launchd on macOS)
+engram start
 ```
 
-Open `http://localhost:8000` for the dashboard.
+Open [http://localhost:8000](http://localhost:8000)
+
+See **[SETUP.md](SETUP.md)** for full instructions including Neo4j AuraDB and Gemini API key setup.
 
 ---
 
 ## CLI
 
 ```
-engram start              Start server as background daemon (auto-restarts on login)
+engram start              Start server as background daemon
 engram stop               Stop the server
 engram status             Live server health + knowledge graph stats
 engram search <query>     Semantic search over your decision history
 engram install            Configure MCP for Claude Code, Cursor, VS Code
-engram capture            Capture from stdin (pipe any conversation)
+engram capture            Capture from stdin — pipe any conversation
 engram delete <id>        Remove a decision from graph + vector store
 engram retry              Retry failed ingests from the local queue
-engram service install    Install as launchd service (macOS)
+engram service install    Install launchd service — auto-starts on login (macOS)
 engram service uninstall  Remove the launchd service
 ```
 
 ### Examples
 
 ```bash
-# Search your decision history
-engram search "database for high throughput writes"
-→ Chose managed ClickHouse over PostgreSQL, Kafka, and BigQuery
-  database · analytics_platform · score: 0.714
-
-# Capture any conversation
-cat conversation.txt | engram capture --project my-api --tool claude
+# Search across all your past decisions semantically
+engram search "database for high throughput analytics"
+→ ● Chose managed ClickHouse over PostgreSQL, Kafka, BigQuery
+    id: cb5b0db3 · database · analytics_platform · score: 0.714
 
 # Check graph health
 engram status
@@ -89,52 +97,72 @@ engram status
 → Counterfactuals     54
 → Sessions            13
 → Avg weight          0.643
+
+# Capture any conversation from stdin
+cat conversation.txt | engram capture --project my-api --tool claude
 ```
 
 ---
 
-## MCP integration — works with Claude Code, Cursor, and VS Code
+## MCP integration — Claude Code, Cursor, VS Code
 
-`engram install` configures all three tools at once. After setup, your AI tools call Engram automatically:
+`engram install` configures all three tools simultaneously. After setup:
 
 ```
-# Claude Code, Cursor, or VS Code Copilot (Agent mode)
-"Capture this session to Engram"           → saves decisions to graph
+"Capture this session to Engram"           → saves decisions + counterfactuals to graph
 "What does Engram know about databases?"   → 4-level causal retrieval
-"Have I rejected Kafka before?"            → counterfactual warning
-"Show my Engram graph stats"               → live knowledge graph stats
+"Have I rejected Kafka before?"            → surfaces past rejections with reasons
+"Show my Engram graph stats"               → live knowledge graph health
 ```
 
-Claude Code also captures sessions **automatically** — Engram injects instructions into `~/.claude/CLAUDE.md` so capture happens at session end without prompting.
+Claude Code captures sessions **automatically** — Engram injects rules into `~/.claude/CLAUDE.md` so capture happens at session end without prompting.
 
-Config locations:
-- Claude Code: `~/.claude/settings.json`
-- Cursor:      `~/.cursor/mcp.json`
-- VS Code:     `.vscode/mcp.json` (note: uses `"servers"` key, not `"mcpServers"`)
+| Tool | Config location |
+|---|---|
+| Claude Code | `~/.claude/settings.json` |
+| Cursor | `~/.cursor/mcp.json` |
+| VS Code | `.vscode/mcp.json` (uses `"servers"` key) |
 
 ---
 
 ## How it works
 
-### The knowledge graph
+### Extraction pipeline (LangGraph)
 
-Every ingested session creates three types of nodes in Neo4j:
+```
+Raw session content
+        ↓
+  triage_node      →  Is this high-signal or noise? (Gemini Flash)
+        ↓
+  extractor_node   →  Extract atomic decisions + counterfactuals (Gemini Pro)
+        ↑_____________retry (up to 2x if critique score < 7)
+  critique_node    →  Score extraction quality 0-10 (Gemini Flash)
+        ↓
+  graph_writer     →  Write to Neo4j + embed to ChromaDB + run linker
+```
 
-**Decision nodes** — one per atomic choice. `summary`, `chosen`, `reasoning`, `domain`, `situation_context`, `epistemic_weight`, `decay_rate`.
+### The knowledge graph (Neo4j)
 
-**Counterfactual nodes** — every rejected alternative. `rejected_option`, `rejection_reason`, `rejection_concern` (controlled vocabulary). This is the data no other system captures.
+Three node types, five relationship types:
 
-**Typed relationship edges** — created automatically by the linker:
-- `CAUSED_BY` — new decision explicitly builds on a prior one
-- `SUPERSEDES` — newer decision in same domain/project replaces older
-- `SIMILAR_TO` — semantically similar decisions across projects
+```
+Decision node          → what was chosen, why, situation context, epistemic weight
+Counterfactual node    → what was rejected, rejection reason, rejection concern
+Session node           → metadata: tool, project, timestamp, content hash
+
+CAUSED_BY    → new decision explicitly builds on a prior one
+SUPERSEDES   → newer decision replaces older in same domain/project
+SIMILAR_TO   → semantically similar across projects (score > 0.87)
+CONTRADICTS  → same option chosen in one project, rejected in another
+REJECTED_IN  → counterfactual belongs to a decision
+```
 
 ### 4-level causal retrieval
 
 ```
-Level 1  Semantic search (ChromaDB)
-         → decision IDs + summaries ranked by cosine similarity
-           works across ALL domains — finds related decisions by meaning
+Level 1  Semantic search (ChromaDB, local)
+         → cosine similarity across all 768-dim embeddings
+           finds related decisions by meaning, not domain keyword
 
 Level 2  Causal ancestry (Neo4j)
          → traverses CAUSED_BY edges upstream
@@ -142,63 +170,65 @@ Level 2  Causal ancestry (Neo4j)
 
 Level 3  Full episode (Neo4j)
          → decision + all counterfactuals + outcomes
-           the complete context for each relevant decision
+           complete context for each relevant decision
 
 Level 4  Counterfactual surface
          → "You rejected X in 3 similar situations. Here's why."
-           nobody else has this
+           nobody else has this layer
 ```
 
-### The epistemic weight engine
+### Epistemic weight engine
 
-Decisions are not equally trustworthy. The weight engine runs asynchronously:
+Decisions are not equally trustworthy. The engine runs asynchronously:
 
-- **Time decay** — `W(t) = W₀ · e^(-λt)` where λ is set per decision type at extraction (0.01 architectural → 0.30 trivial)
-- **Override signal** — newer decisions in the same domain/project decay older ones via `SUPERSEDES`
-- **Propagation boost** — retrieved and reused decisions gain weight
-- **Contradiction detection** — same option chosen in one project, rejected in another → `CONTRADICTS` edge
+- **Time decay** — `W(t) = W₀ · e^(-λt)` where λ is assigned at extraction time (0.01 for architecture → 0.30 for trivial preferences)
+- **Override signal** — newer decisions in same domain/project decay older ones via `SUPERSEDES`
+- **Propagation boost** — retrieved and reused decisions gain weight (+0.05)
+- **Contradiction detection** — option chosen in one project, rejected in another → `CONTRADICTS` edge
+
+Good decisions solidify. Bad ones fade. No manual intervention required.
 
 ### Local-first architecture
 
-- Vector embeddings stored locally at `~/.engram/chroma` (ChromaDB) — no cloud dependency, no IP whitelisting
+- Vector embeddings stored at `~/.engram/chroma` (ChromaDB) — no cloud dependency, no IP whitelisting
 - Failed ingests queued to `~/.engram/queue/` — nothing lost when Gemini is down
-- Duplicate detection via content hashing — same session never ingested twice
-- Server persists across reboots via launchd (macOS) — runs in the background always
+- Duplicate detection via SHA-256 content hash — same session never ingested twice
+- Server persists across reboots via launchd — always running in background
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  Capture Layer                                               │
-│  MCP Server (Claude Code, Cursor, VS Code)                  │
-│  Manual paste · engram capture (stdin)                      │
-└──────────────────────┬──────────────────────────────────────┘
-                       ↓
-┌─────────────────────────────────────────────────────────────┐
-│  LangGraph Extraction Pipeline                              │
-│  triage_node → extractor_node → critique_node               │
-│       ↑_____________ (reflection loop) _____|               │
-│  graph_writer_node → linker → Neo4j + ChromaDB              │
-└──────────────────────┬──────────────────────────────────────┘
-                       ↓
-┌────────────────────────────┐  ┌──────────────────────────────┐
-│  Neo4j AuraDB              │  │  ChromaDB (local)            │
-│  Causal knowledge graph    │  │  Vector embeddings           │
-│  Decision + CF + edges     │  │  ~/.engram/chroma            │
-└──────────────┬─────────────┘  └─────────────┬────────────────┘
-               └────────────────┬──────────────┘
-                                ↓
-┌─────────────────────────────────────────────────────────────┐
-│  4-Level Causal Retrieval                                   │
-│  L1 semantic → L2 ancestry → L3 episode → L4 counterfactual│
-└──────────────────────┬──────────────────────────────────────┘
-                       ↓
-┌─────────────────────────────────────────────────────────────┐
-│  Injection Layer                                            │
-│  MCP context provider · Session briefing · engram search   │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│  Capture Layer                                      │
+│  MCP (Claude Code · Cursor · VS Code)               │
+│  Manual paste · engram capture · Bookmarklet        │
+└───────────────────────┬─────────────────────────────┘
+                        ↓
+┌─────────────────────────────────────────────────────┐
+│  LangGraph Extraction Pipeline                      │
+│  triage → extract → critique → write → link         │
+│              ↑__________(reflection loop)____|      │
+└───────────────────────┬─────────────────────────────┘
+                        ↓
+┌──────────────────────┐  ┌──────────────────────────┐
+│  Neo4j AuraDB        │  │  ChromaDB (local)        │
+│  Causal graph        │  │  Vector embeddings       │
+│  Decision + CF nodes │  │  ~/.engram/chroma        │
+│  Typed edges         │  │  Gemini text-embedding   │
+└──────────┬───────────┘  └────────────┬─────────────┘
+           └──────────────┬────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────┐
+│  4-Level Causal Retrieval                           │
+│  L1 semantic → L2 ancestry → L3 episode → L4 CF     │
+└───────────────────────┬─────────────────────────────┘
+                        ↓
+┌─────────────────────────────────────────────────────┐
+│  Injection Layer                                    │
+│  MCP context provider · Briefing · engram search    │
+└─────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -207,73 +237,83 @@ Decisions are not equally trustworthy. The weight engine runs asynchronously:
 
 | Layer | Technology | Why |
 |---|---|---|
-| Agent framework | LangGraph 0.2 | Conditional edges for reflection loop, stateful pipeline |
-| LLM | Google Gemini 2.5 Pro/Flash | Pro for extraction quality, Flash for triage/critique |
-| Graph database | Neo4j AuraDB | Native graph traversal, causal queries, typed relationships |
+| Agent framework | LangGraph 0.2 | Conditional edges, stateful pipeline, reflection loop |
+| LLM | Google Gemini 2.5 Pro / Flash | Pro for extraction quality, Flash for triage speed |
+| Graph database | Neo4j AuraDB Free | Native graph traversal, typed relationships, causal queries |
 | Vector store | ChromaDB (local) | Zero network dependency, works on any wifi |
 | API | FastAPI | Async, auto-docs, Pydantic validation |
-| CLI | Python argparse | `engram install` wires up all three AI tools at once |
+| CLI | Python (argparse + setup.py) | `engram install` wires all three AI tools at once |
 | MCP server | Python stdio | Passive capture from Claude Code, Cursor, VS Code |
-| Observability | Datadog APM + Sentry | Full trace per pipeline run, error tracking |
-| Secret management | Doppler | Zero `.env` files |
+| Observability | Datadog APM + Sentry | Full trace per pipeline run, real-time error capture |
+| Secret management | Doppler / python-dotenv | Zero hardcoded credentials |
 
 ---
 
 ## Agentic patterns demonstrated
 
-- **Multi-node LangGraph pipeline** with shared TypedDict state
-- **Triage gate** — cheap Flash model decides if content is worth expensive Pro extraction
-- **Self-correction / reflection loop** — Critique node scores quality, routes back to extractor on failure
-- **Knowledge graph write** — typed Neo4j nodes with causal relationship edges
-- **Decision linker** — automatically creates CAUSED_BY, SUPERSEDES, SIMILAR_TO edges
-- **Causal graph traversal** — 4-level retrieval agent traverses ancestry
-- **Epistemic weight evolution** — async background engine evolves node weights
-- **MCP server** — stdio protocol server working across Claude Code, Cursor, VS Code
-- **Local-first vector search** — ChromaDB replaces hosted Atlas for zero network dependency
+- **Multi-node LangGraph pipeline** — 5 specialized nodes with shared TypedDict state
+- **Triage gate** — cheap Flash model blocks noise before expensive Pro extraction
+- **Self-correction loop** — Critique node scores quality, routes back to extractor on failure
+- **Knowledge graph write** — typed Neo4j nodes with causal relationship edges created automatically
+- **Decision linker** — CAUSED_BY, SUPERSEDES, SIMILAR_TO edges via semantic similarity
+- **Causal graph traversal** — 4-level retrieval agent traverses ancestry chains
+- **Epistemic weight engine** — async background process evolves node weights over time
+- **MCP server (stdio)** — works across Claude Code, Cursor, VS Code simultaneously
+- **Local-first vector search** — ChromaDB replaces hosted Atlas, zero network dependency
 - **Persistent daemon** — launchd service auto-starts on macOS login
+- **Retry queue** — failed ingests saved to `~/.engram/queue/`, never lost
+- **Content deduplication** — SHA-256 hash prevents re-ingesting the same session
+
+---
+
+## What makes it different from claude-mem and mem0
+
+**vs claude-mem:** claude-mem captures everything that happens in a Claude Code session via hooks — every tool call, every file edit. It answers *what happened*. Engram captures *why you decided something and what you rejected*. Engram is cross-project and cross-tool (Claude Code + Cursor + VS Code + any tool via paste/bookmarklet). claude-mem is Claude Code only.
+
+**vs mem0:** mem0 is an SDK you embed into your own application. Engram is a personal tool you install once and it works on top of every AI tool you already use. mem0 stores facts. Engram stores causal decision graphs with epistemic weights that evolve over time.
+
+---
+
+## Running tests
+
+```bash
+pytest tests/ -v
+# 64 tests — queue, vector_client, linker, API endpoints, CLI commands
+```
 
 ---
 
 ## Running locally
 
-**Prerequisites:** Python 3.11+, [Doppler CLI](https://docs.doppler.com/docs/install-cli), [Neo4j AuraDB Free](https://neo4j.com/cloud/aura)
+**Prerequisites:** Python 3.11+, Neo4j AuraDB free account, Gemini API key
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/engram
-cd engram
+git clone https://github.com/bitphonix/Engram
+cd Engram
 python -m venv venv && source venv/bin/activate
 pip install -e .
-
-# Configure secrets
-doppler setup   # select project: engram, config: development
-# Required: NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD, GEMINI_API_KEY
-
-# Start
+cp .env.example .env
+# Fill in: NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD, GEMINI_API_KEY
 engram start
-engram install
-
-# Open dashboard
-open http://localhost:8000
 ```
 
-### Running tests
-
-```bash
-pytest tests/ -v
-# 64 tests — queue, vector_client, linker, API endpoints, CLI
-```
+Full step-by-step: **[SETUP.md](SETUP.md)**
 
 ---
 
 ## Roadmap
 
-- [ ] Browser extension — passive capture from Claude.ai, ChatGPT, Gemini web
-- [ ] FS watcher — capture from IDE file changes as outcome signal
-- [ ] Local SLM triage — replace cloud Flash model with ONNX for zero API cost
-- [ ] Outcome feedback loop — git signals update epistemic weights automatically
-- [ ] Public graph — opt-in sharing of decision graphs
+- [ ] Browser extension — native capture from Claude.ai, ChatGPT, Gemini web
+- [ ] FS watcher — capture IDE file changes as outcome signal
+- [ ] Local SLM triage — replace cloud Flash with ONNX, zero API cost
+- [ ] Git signals — git stability updates epistemic weights automatically
 - [ ] Team sync — shared knowledge graph for engineering teams
+- [ ] Outcome feedback loop — automatic weight updates from real-world results
 
 ---
 
-Built by [Tanishk Soni](https://github.com/bitphonix) · [LinkedIn](https://linkedin.com/in/tanishk-soni-a94077239)
+<div align="center">
+
+Built by [Tanishk Soni](https://linkedin.com/in/tanishk-soni-a94077239) · [GitHub](https://github.com/bitphonix)
+
+</div>
