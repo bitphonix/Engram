@@ -292,6 +292,22 @@
 const API = 'http://localhost:8000';
 let graphData = {nodes:[], edges:[]};
 let simulation, svg, zoomBehavior, activeFilter = '';
+async function deleteDecision(id) {
+  if (!confirm('Permanently delete this decision and its counterfactuals?')) return;
+  try {
+    const res = await fetch(`${API}/decisions/${id}`, {method: 'DELETE'});
+    if (res.ok) {
+      document.getElementById('node-detail').innerHTML =
+        '<div class="empty" style="padding-top:40px;color:var(--green)">✓ Decision deleted</div>';
+      loadGraph(); // Refresh the graph
+      loadStats();
+    } else {
+      alert('Delete failed.');
+    }
+  } catch(e) {
+    alert(`Error: ${e.message}`);
+  }
+}
 
 // ── Domain colors ──────────────────────────────────────────────────────────────
 const DOMAIN_COLOR = {
@@ -669,6 +685,8 @@ function showNodeDetail(d) {
     <div style="margin-top:12px">
       <button class="btn btn-ghost" style="font-size:10px;padding:5px 12px;width:100%"
         onclick="loadFullEpisode('${d.id}')">Load full episode →</button>
+      <button class="btn btn-ghost" style="font-size:10px;padding:5px 12px;width:100%;margin-top:6px;border-color:var(--red);color:var(--red)"
+        onclick="deleteDecision('${d.id}')">Delete decision</button>
     </div>
     <div id="episode-detail" style="margin-top:12px"></div>
   `;

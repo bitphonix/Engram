@@ -199,8 +199,23 @@ def cmd_stop(args):
         warn("Engram server is not running.")
         return
 
-    pid = int(PID_FILE.read_text().strip())
+    # If managed by launchd, unload the service
+    plist = Path.home() / "Library" / "LaunchAgents" / "com.engram.server.plist"
+    if plist.exists() and not PID_FILE.exists():
+        result = subprocess.run(
+            ["launchctl", "unload", str(plist)],
+            capture_output=True
+        )
+        if result.returncode == 0:
+            ok("Engram server stopped (launchd service unloaded).")
+            warn("To restart: launchctl load ~/Library/LaunchAgents/com.engram.server.plist")
+        else:
+            err(f"launchctl unload failed: {result.stderr.decode()}")
+        return
+
+    # Manual start — kill by PID
     try:
+        pid = int(PID_FILE.read_text().strip())
         os.killpg(os.getpgid(pid), signal.SIGTERM)
         PID_FILE.unlink(missing_ok=True)
         ok("Engram server stopped.")
@@ -267,7 +282,7 @@ def cmd_search(args):
             for d in decisions:
                 score = d.get("score", 0)
                 print(f"  {ORANGE}●{RESET} {d.get('summary', '')[:80]}")
-                print(f"    {DIM}{d.get('domain','')} · {d.get('project_id','')} · score: {score:.3f}{RESET}")
+                print(f"    {DIM}id: {d.get('id','')} · {d.get('domain','')} · {d.get('project_id','')} · score: {score:.3f}{RESET}")
             print()
 
         if warnings:
@@ -575,6 +590,32 @@ def cmd_retry(args):
     if failed:
         warn(f"Run 'engram retry' again when the issue is resolved.")
 
+
+def cmd_delete(args):
+    """Delete a decision by ID from Neo4j and ChromaDB."""
+    decision_id = args.decision_id
+
+    if not is_server_running():
+        err("Server not running. Run: engram start")
+        return
+
+    # Confirm before deleting
+    if not getattr(args, "force", False):
+        confirm = input(f"Delete decision {decision_id[:8]}…? [y/N] ").strip().lower()
+        if confirm != "y":
+            warn("Cancelled.")
+            return
+
+    try:
+        import urllib.request
+        url = f"{get_api_url()}/decisions/{decision_id}"
+        req = urllib.request.Request(url, method="DELETE")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            result = json.loads(resp.read().decode())
+        ok(f"Decision {decision_id[:8]}… deleted from graph and vector store.")
+    except Exception as e:
+        err(f"Delete failed: {e}")
+
 # ── Entry point ───────────────────────────────────────────────────
 
 def main():
@@ -623,6 +664,12 @@ commands:
     # retry
     subparsers.add_parser("retry", help="Retry failed ingests from queue")
 
+    # delete
+    p_delete = subparsers.add_parser("delete", help="Delete a decision by ID")
+    p_delete.add_argument("decision_id", help="Decision ID to delete")
+    p_delete.add_argument("--force", action="store_true",
+                           help="Skip confirmation prompt")
+
     # service
     p_service = subparsers.add_parser("service", help="Manage system service")
     p_service.add_argument("action", choices=["install", "uninstall"],
@@ -647,6 +694,8 @@ commands:
         cmd_service(args)
     elif args.command == "retry":
         cmd_retry(args)
+    elif args.command == "delete":
+        cmd_delete(args)
     else:
         parser.print_help()
 

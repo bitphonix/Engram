@@ -313,3 +313,20 @@ def session_hash_exists(content_hash: str) -> bool:
     with get_driver().session() as session:
         result = _run_with_retry(session, query, {"hash": content_hash})
         return result.single() is not None
+
+
+def delete_decision(decision_id: str) -> bool:
+    """
+    Permanently removes a decision node and all its edges from Neo4j.
+    Also removes connected counterfactuals.
+    """
+    query = """
+        MATCH (d:Decision {id: $decision_id})
+        OPTIONAL MATCH (d)<-[:REJECTED_IN]-(c:Counterfactual)
+        DETACH DELETE d, c
+        RETURN count(d) AS deleted
+    """
+    with get_driver().session() as session:
+        result = _run_with_retry(session, query, {"decision_id": decision_id})
+        record = result.single()
+        return record and record["deleted"] > 0

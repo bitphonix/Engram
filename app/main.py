@@ -171,6 +171,29 @@ def get_decision(decision_id: str):
     return episode
 
 
+@app.delete("/decisions/{decision_id}")
+def delete_decision_endpoint(decision_id: str):
+    """
+    Permanently delete a decision and its counterfactuals.
+    Also removes from ChromaDB vector store.
+    """
+    from app.db.neo4j_client import delete_decision
+    from app.db.vector_client import _get_collection
+
+    # Remove from Neo4j
+    deleted = delete_decision(decision_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Decision not found")
+
+    # Remove from ChromaDB
+    try:
+        col = _get_collection()
+        col.delete(ids=[decision_id])
+    except Exception:
+        pass  
+    return {"deleted": True, "id": decision_id}
+
+
 @app.post("/search")
 def quick_search(req: ContextRequest):
     """
