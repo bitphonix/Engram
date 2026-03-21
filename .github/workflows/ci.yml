@@ -17,8 +17,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-cov
+          pip install -e .
+          pip install pytest pytest-cov httpx
 
       - name: Run tests
         run: |
-          pytest tests/ -v --ignore=tests/test_api.py
+          pytest tests/test_cli.py tests/test_queue.py tests/test_linker.py tests/test_vector_client.py -v
