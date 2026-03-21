@@ -22,4 +22,7 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest tests/test_cli.py tests/test_queue.py tests/test_linker.py tests/test_vector_client.py -v
+          pytest tests/test_cli.py -v
+          pytest tests/test_queue.py -v
+          pytest tests/test_linker.py -v
+          pytest tests/test_vector_client.py -v
