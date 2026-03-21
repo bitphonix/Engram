@@ -7,6 +7,7 @@ import time
 from datetime import datetime, timezone
 from typing import Optional
 
+from langchain.agents import tool
 from neo4j import GraphDatabase, Driver
 from app.db.schema import (
     CYPHER, SessionNode, DecisionNode,
@@ -79,13 +80,16 @@ def setup_constraints():
 
 
 def save_session(tool: str, project_id: Optional[str],
-                 captured_via: str, raw_excerpt: Optional[str] = None) -> str:
+                 captured_via: str, raw_excerpt: Optional[str] = None,
+                 content_hash: Optional[str] = None) -> str:
     node = SessionNode(
         id=str(uuid.uuid4()), tool=tool, project_id=project_id,
         raw_excerpt=raw_excerpt, started_at=datetime.now(timezone.utc),
         captured_via=captured_via,
     )
     props = node.model_dump(mode="json")
+    if content_hash:
+        props["content_hash"] = content_hash
     with get_driver().session() as session:
         _run_with_retry(session, CYPHER["create_session"],
                         {"id": node.id, "props": props})
@@ -286,3 +290,26 @@ def get_graph_network() -> dict:
             for r in edges_result
         ]
     return {"nodes": nodes, "edges": edges}
+
+
+def session_exists(content_hash: str) -> bool:
+    """Check if a session with this content hash already exists."""
+    query = """
+        MATCH (s:Session {content_hash: $hash})
+        RETURN s.id LIMIT 1
+    """
+    with get_driver().session() as session:
+        result = _run_with_retry(session, query, {"hash": content_hash})
+        return result.single() is not None
+    
+
+def session_hash_exists(content_hash: str) -> bool:
+    """Returns True if a session with this content hash was already ingested."""
+    query = """
+        MATCH (s:Session)
+        WHERE s.content_hash = $hash
+        RETURN s.id LIMIT 1
+    """
+    with get_driver().session() as session:
+        result = _run_with_retry(session, query, {"hash": content_hash})
+        return result.single() is not None

@@ -14,9 +14,7 @@ from app.models.extraction import (
     TriageOutput, ExtractionOutput, ExtractedDecision, ExtractedCounterfactual
 )
 
-# ── LLM setup ─────────────────────────────────────────────────────────────────
-# Flash for triage and critique — fast, cheap, no deep reasoning needed
-# Pro for extraction — quality matters, counterfactuals need nuanced reasoning
+
 _flash = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
     google_api_key=os.getenv("GEMINI_API_KEY"),
@@ -227,6 +225,20 @@ def graph_writer_node(state: State) -> dict:
     from app.db.neo4j_client import save_session, save_decision, save_counterfactual
     from app.db.vector_client import embed_and_store_decision, embed_and_store_counterfactual
     from app.agents.linker import link_decision
+    import hashlib
+
+    content_hash = hashlib.sha256(
+        state["raw_content"].encode()
+    ).hexdigest()[:16]
+
+    from app.db.neo4j_client import session_hash_exists
+    if session_hash_exists(content_hash):
+        return {
+            "session_id":            None,
+            "saved_decision_ids":    [],
+            "saved_counterfact_ids": [],
+            "error":                 "duplicate: session already ingested",
+        }
 
     decisions = state.get("decisions") or []
     if not decisions:
@@ -234,10 +246,11 @@ def graph_writer_node(state: State) -> dict:
 
     try:
         session_id = save_session(
-            tool=state.get("tool", "unknown"),
-            project_id=state.get("project_id"),
-            captured_via=state.get("captured_via", "manual_paste"),
-            raw_excerpt=state["raw_content"][:500],
+        tool=state.get("tool", "unknown"),
+        project_id=state.get("project_id"),
+        captured_via=state.get("captured_via", "manual_paste"),
+        raw_excerpt=state["raw_content"][:500],
+        content_hash=content_hash,
         )
 
         saved_decision_ids    = []
