@@ -128,32 +128,50 @@ Claude Code captures sessions **automatically** — Engram injects rules into `~
 
 ### Extraction pipeline (LangGraph)
 
-```
-Raw session content
-        ↓
-  triage_node      →  Is this high-signal or noise? (Gemini Flash)
-        ↓
-  extractor_node   →  Extract atomic decisions + counterfactuals (Gemini Pro)
-        ↑_____________retry (up to 2x if critique score < 7)
-  critique_node    →  Score extraction quality 0-10 (Gemini Flash)
-        ↓
-  graph_writer     →  Write to Neo4j + embed to ChromaDB + run linker
+```mermaid
+flowchart TD
+    Raw[Raw session content] --> Triage{triage_node}
+    Triage -- Noise --> LowSignal[Drop: Low Signal]
+    Triage -- High Signal --> Extractor[extractor_node\nExtract decisions & counterfactuals]
+    Extractor --> Critique{critique_node\nScore > 7?}
+    Critique -- Fail --> Extractor
+    Critique -- Pass --> Writer[graph_writer\nWrite to Neo4j, ChromaDB, & Linker]
+
+    classDef default fill:#1E293B,stroke:#60A5FA,stroke-width:2px,color:#F8FAFC
+    classDef conditional fill:#334155,stroke:#F472B6,stroke-width:2px,color:#F8FAFC
+    class Triage,Critique conditional
 ```
 
 ### The knowledge graph (Neo4j)
 
 Three node types, five relationship types:
 
-```
-Decision node          → what was chosen, why, situation context, epistemic weight
-Counterfactual node    → what was rejected, rejection reason, rejection concern
-Session node           → metadata: tool, project, timestamp, content hash
+```mermaid
+erDiagram
+    SESSION {
+        string tool
+        string project
+        datetime timestamp
+        string content_hash
+    }
+    DECISION {
+        string chosen
+        string reasoning
+        string situation_context
+        float epistemic_weight
+    }
+    COUNTERFACTUAL {
+        string rejected_option
+        string rejection_reason
+        string rejection_concern
+    }
 
-CAUSED_BY    → new decision explicitly builds on a prior one
-SUPERSEDES   → newer decision replaces older in same domain/project
-SIMILAR_TO   → semantically similar across projects (score > 0.87)
-CONTRADICTS  → same option chosen in one project, rejected in another
-REJECTED_IN  → counterfactual belongs to a decision
+    SESSION ||--o{ DECISION : "contains"
+    DECISION ||--|{ COUNTERFACTUAL : "REJECTED_IN"
+    DECISION ||--o{ DECISION : "CAUSED_BY (builds on)"
+    DECISION ||--o{ DECISION : "SUPERSEDES (replaces)"
+    DECISION ||--o{ DECISION : "SIMILAR_TO (semantic match)"
+    DECISION ||--o{ DECISION : "CONTRADICTS (opposing choice)"
 ```
 
 ### 4-level causal retrieval
@@ -198,36 +216,43 @@ Good decisions solidify. Bad ones fade. No manual intervention required.
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────┐
-│  Capture Layer                                      │
-│  MCP (Claude Code · Cursor · VS Code)               │
-│  Manual paste · engram capture · Bookmarklet        │
-└───────────────────────┬─────────────────────────────┘
-                        ↓
-┌─────────────────────────────────────────────────────┐
-│  LangGraph Extraction Pipeline                      │
-│  triage → extract → critique → write → link         │
-│              ↑__________(reflection loop)____|      │
-└───────────────────────┬─────────────────────────────┘
-                        ↓
-┌──────────────────────┐  ┌──────────────────────────┐
-│  Neo4j AuraDB        │  │  ChromaDB (local)        │
-│  Causal graph        │  │  Vector embeddings       │
-│  Decision + CF nodes │  │  ~/.engram/chroma        │
-│  Typed edges         │  │  Gemini text-embedding   │
-└──────────┬───────────┘  └────────────┬─────────────┘
-           └──────────────┬────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────┐
-│  4-Level Causal Retrieval                           │
-│  L1 semantic → L2 ancestry → L3 episode → L4 CF     │
-└───────────────────────┬─────────────────────────────┘
-                        ↓
-┌─────────────────────────────────────────────────────┐
-│  Injection Layer                                    │
-│  MCP context provider · Briefing · engram search    │
-└─────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph Capture["Capture Layer"]
+        MCP["MCP Server<br/>(Claude Code, Cursor, VS Code)"]
+        CLI["CLI / Manual Paste<br/>enrgam capture"]
+    end
+
+    subgraph Pipeline["LangGraph Extraction Pipeline"]
+        direction LR
+        Triage["Triage"] --> Extract["Extract"]
+        Extract --> Critique["Critique"]
+        Critique -- "Reflection Loop" --> Extract
+        Critique --> Write["Write & Link"]
+    end
+
+    subgraph Storage["Data Persistence"]
+        direction LR
+        Neo4j[("Neo4j AuraDB<br/>Causal Graph<br/>(Decision + CF edges)")]
+        Chroma[("ChromaDB (local)<br/>Vector Embeddings<br/>(~/.engram/chroma)")]
+    end
+
+    subgraph Injection["Injection Layer"]
+        L1["L1 Semantic"] --> L2["L2 Ancestry"] --> L3["L3 Episode"] --> L4["L4 Counterfactuals"]
+        Provider["MCP Provider / Briefing / Search"]
+    end
+
+    Capture --> Pipeline
+    Write --> Neo4j
+    Write --> Chroma
+    Neo4j --> L1
+    Chroma --> L1
+    L4 --> Provider
+
+    classDef layer fill:#0F172A,stroke:#64748B,stroke-width:2px,color:#F8FAFC
+    classDef graphNode fill:#1E293B,stroke:#3B82F6,stroke-width:2px,color:#E2E8F0
+    class Capture,Pipeline,Storage,Injection layer
+    class Neo4j,Chroma,MCP,CLI,Provider,L1,L2,L3,L4,Triage,Extract,Critique,Write graphNode
 ```
 
 ---
