@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- 
+    Engram Mascot — "Ellie"
+    A cute, front-facing elephant.
+    No background — fully transparent.
+    Brand color: #00c5a0 (Teal)
+  -->
+
+  <g fill="#00c5a0">
+
+    <!-- LEFT EAR -->
+    <ellipse cx="42" cy="94" rx="26" ry="32" />
+
+    <!-- RIGHT EAR -->
+    <ellipse cx="158" cy="94" rx="26" ry="32" />
+
+    <!-- BODY (lower, rounded rectangle) -->
+    <rect x="62" y="110" width="76" height="52" rx="20" />
+
+    <!-- HEAD (big circle) -->
+    <circle cx="100" cy="88" r="48" />
+
+    <!-- LEFT LEG -->
+    <rect x="68" y="152" width="22" height="32" rx="11" />
+
+    <!-- RIGHT LEG -->
+    <rect x="110" y="152" width="22" height="32" rx="11" />
+
+    <!-- EAR INNER LEFT (slightly darker to give depth) -->
+    <ellipse cx="42" cy="94" rx="16" ry="22" fill="#00a88a" />
+
+    <!-- EAR INNER RIGHT -->
+    <ellipse cx="158" cy="94" rx="16" ry="22" fill="#00a88a" />
+
+    <!-- TRUNK (curving down from center of face) -->
+    <path
+      d="M90 126 Q88 148 82 158 Q78 165 84 168 Q91 171 95 162 Q101 148 100 130"
+      fill="#00c5a0"
+    />
+
+    <!-- TRUNK TIP (round cap) -->
+    <ellipse cx="86" cy="163" rx="9" ry="7" fill="#00c5a0" />
+
+  </g>
+
+  <!-- EYES — white with pupils -->
+  <circle cx="84" cy="82" r="9" fill="white" />
+  <circle cx="116" cy="82" r="9" fill="white" />
+  <!-- Pupils -->
+  <circle cx="86" cy="84" r="4.5" fill="#003d30" />
+  <circle cx="118" cy="84" r="4.5" fill="#003d30" />
+  <!-- Eye shine -->
+  <circle cx="88" cy="82" r="1.8" fill="white" />
+  <circle cx="120" cy="82" r="1.8" fill="white" />
+
+  <!-- TUSK LEFT (small cute tusk) -->
+  <path d="M88 117 Q78 126 74 132 Q72 136 76 137 Q80 138 84 132 Q89 124 92 118 Z" fill="#e8f9f5" />
+
+  <!-- TUSK RIGHT -->
+  <path d="M112 117 Q122 126 126 132 Q128 136 124 137 Q120 138 116 132 Q111 124 108 118 Z" fill="#e8f9f5" />
+
+</svg>

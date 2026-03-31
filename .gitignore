@@ -18,3 +18,8 @@ coverage.xml
 # Ignore local AI prompts not relevant to project
 .github/copilot-instructions.md
 .github/prompts/
+
+# Node (pretext installed locally but website uses CDN — no build step needed)
+node_modules/
+package.json
+package-lock.json

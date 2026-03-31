@@ -1,3 +1,4 @@
+import { prepareWithSegments, layoutWithLines } from '@chenglou/pretext';
 
 const canvas = document.getElementById('arch-canvas');
 const ctx = canvas.getContext('2d');
@@ -146,6 +147,31 @@ function glowText(text, x, y, color, size=11, alpha=1, tracking=2) {
   ctx.restore();
 }
 
+function glowMultilineText(text, x, y, maxWidth, color, size=11, alpha=1, tracking=2) {
+  const {r,g,b} = hexToRgb(color);
+  ctx.save();
+  const fontStr = `${size}px "Courier New", monospace`;
+  ctx.font = fontStr;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowBlur = 12;
+  ctx.shadowColor = color;
+  ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+  ctx.letterSpacing = `${tracking}px`;
+
+  const prepared = prepareWithSegments(text, fontStr, { whiteSpace: 'pre-wrap' });
+  const lineHeight = size * 1.5;
+  const { lines } = layoutWithLines(prepared, maxWidth, lineHeight);
+
+  const blockHeight = lines.length * lineHeight;
+  const startY = y - (blockHeight / 2) + (lineHeight / 2);
+
+  for (let i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i].text, x, startY + i * lineHeight);
+  }
+  ctx.restore();
+}
+
 function glassPanel(x, y, w, h, color, alpha=0.7, borderAlpha=0.4) {
   const {r,g,b} = hexToRgb(color);
   ctx.save();
@@ -268,9 +294,9 @@ function drawStage1(progress, centerY) {
   if(fade <= 0) return;
 
   const positions = [
-    {x: W/2-220, label:'Claude / Cursor\nVS Code', sub:'MCP', color: C.teal},
-    {x: W/2,     label:'Manual\nPaste', sub:'', color: C.cyan},
-    {x: W/2+220, label:'Bookmarklet', sub:'', color: C.tealDim},
+    {x: W/2-240, label:'Claude / Cursor IDE', sub:'MCP Integration hooks directly into the conversational event bus', color: C.teal},
+    {x: W/2,     label:'Manual HTTP Dashboard', sub:'', color: C.cyan},
+    {x: W/2+240, label:'Chrome Sync Bookmarklet', sub:'', color: C.tealDim},
   ];
 
   const pW = 140, pH = 90;
@@ -306,10 +332,11 @@ function drawStage1(progress, centerY) {
       ctx.fill();
     }
 
-    const lines = p.label.split('\n');
-    lines.forEach((line, li) => {
-      glowText(line, 0, pH/2+14+li*14, p.color, 9, 0.9*fade, 1);
-    });
+    glowMultilineText(p.label, 0, pH/2+16, pW-10, p.color, 9, 0.95*fade, 1);
+    
+    if (p.sub) {
+      glowMultilineText(p.sub, 0, pH/2+38, pW-10, '#8899aa', 8, 0.7*fade, 0);
+    }
 
     if(p.sub === 'MCP') {
       const bx = pW/2-20, by = -pH/2+5;
@@ -362,10 +389,10 @@ function drawStage2(progress, centerY) {
   if(fade <= 0) return;
 
   const nodes = [
-    {x:W/2-260, label:'TRIAGE', sub:'High signal?', shape:'diamond', color:'#6b7280', size:18},
-    {x:W/2-80,  label:'EXTRACTOR', sub:'Decisions + Alts', shape:'hex', color:C.teal, size:24},
-    {x:W/2+90,  label:'CRITIQUE', sub:'Quality 0-10', shape:'circle', color:C.amber, size:20},
-    {x:W/2+270, label:'GRAPH WRITER', sub:'Embed + Link', shape:'cube', color:C.teal, size:26},
+    {x:W/2-260, label:'TRIAGE NODE', sub:'Filters syntax errors and determines high signal conversations natively.', shape:'diamond', color:'#6b7280', size:18},
+    {x:W/2-80,  label:'EXTRACTOR PILE', sub:'Structurally isolates decisions and counterfactual alternate rejected paths.', shape:'hex', color:C.teal, size:24},
+    {x:W/2+90,  label:'CRITIQUE', sub:'Assesses quality score safely via epistemic feedback.', shape:'circle', color:C.amber, size:20},
+    {x:W/2+270, label:'GRAPH WRITER', sub:'Embeds vector weights & wires the temporal relationships.', shape:'cube', color:C.teal, size:26},
   ];
 
   for(let i=0;i<nodes.length-1;i++) {
@@ -398,7 +425,7 @@ function drawStage2(progress, centerY) {
   ctx.setLineDash([]);
   ctx.restore();
 
-  glowText('retry score<7', arcX, arcY - 42, C.amber, 9, 0.9*fade, 1);
+  glowMultilineText('retry critique', arcX, arcY - 42, 60, C.amber, 9, 0.9*fade, 1);
   const aParam = retryT;
   const arcBezX = (1-aParam)*(1-aParam)*n3.x + 2*(1-aParam)*aParam*arcX + aParam*aParam*n2.x;
   const arcBezY = (1-aParam)*(1-aParam)*(centerY-n3.size) + 2*(1-aParam)*aParam*(arcY-30) + aParam*aParam*(centerY-n2.size);
@@ -448,8 +475,8 @@ function drawStage2(progress, centerY) {
       glowCircle(0, 0, n.size*pulse, n.color, 0.8*fade);
     }
 
-    glowText(n.label, 0, n.size*2 + 18, n.color, 9, 0.95*fade, 2);
-    glowText(n.sub, 0, n.size*2 + 32, '#8899aa', 8, 0.7*fade, 0);
+    glowMultilineText(n.label, 0, n.size*2 + 18, 130, n.color, 9, 0.95*fade, 2);
+    glowMultilineText(n.sub, 0, n.size*2 + 38, 130, '#8899aa', 8, 0.7*fade, 0);
     ctx.restore();
   });
 
@@ -516,8 +543,8 @@ function drawStage3(progress, centerY) {
   });
   neo4jNodes.forEach(n => { glowCircle(n.x, n.y, n.r, n.c, 0.9*fade, 10); });
 
-  glowText('NEO4J AURADB', 0, pH/2-30, C.purple, 9, 0.95*fade, 2);
-  glowText('Causal Knowledge', 0, pH/2-16, '#8899aa', 8, 0.7*fade, 0);
+  glowMultilineText('NEO4J CAUSAL GRAPH', 0, pH/2-30, pW-20, C.purple, 9, 0.95*fade, 2);
+  glowMultilineText('Stores strict topological ancestry', 0, pH/2-10, pW-20, '#8899aa', 8, 0.7*fade, 0);
   ctx.restore();
 
   const cBob = Math.sin(t*0.7+1)*4;
@@ -541,8 +568,8 @@ function drawStage3(progress, centerY) {
     ctx.beginPath(); ctx.ellipse(cc.x, cc.y, cr, cr*0.8, i*0.3, 0, Math.PI*2); ctx.stroke();
   });
 
-  glowText('CHROMADB LOCAL', 0, pH/2-30, C.teal, 9, 0.95*fade, 2);
-  glowText('Vector Embeddings', 0, pH/2-16, '#8899aa', 8, 0.7*fade, 0);
+  glowMultilineText('CHROMADB LOCAL', 0, pH/2-30, pW-20, C.teal, 9, 0.95*fade, 2);
+  glowMultilineText('Stores semantic embeddings', 0, pH/2-10, pW-20, '#8899aa', 8, 0.7*fade, 0);
   ctx.restore();
 }
 
@@ -575,8 +602,8 @@ function drawStage4(progress, centerY) {
       ctx.beginPath(); ctx.ellipse(W/2, yy, lw/2 + pr, lh/2 + pr*0.4, 0, 0, Math.PI*2); ctx.stroke();
     }
 
-    glowText(l.label, W/2, yy - 8, l.color, 10, 0.95*lFade, 2);
-    glowText(l.sub, W/2, yy + 8, '#8899aa', 8, 0.75*lFade, 0);
+    glowMultilineText(l.label, W/2, yy - 8, lw - 20, l.color, 10, 0.95*lFade, 2);
+    glowMultilineText(l.sub, W/2, yy + 12, lw - 20, '#8899aa', 8, 0.75*lFade, 0);
 
     for(let p=0;p<4;p++) {
       const pt = ((t*0.4 + p/4 + i*0.2) % 1);
@@ -635,8 +662,8 @@ function drawStage5(progress, centerY) {
       roundRect(-pW/2+10, 5+ln*12, lw, 4, 2); ctx.fill();
     }
 
-    glowText(p.label, 0, pH/2+12, p.color, 9, 0.95*fade, 2);
-    glowText(p.sub, 0, pH/2+26, '#8899aa', 8, 0.7*fade, 0);
+    glowMultilineText(p.label, 0, pH/2+14, pW-20, p.color, 9, 0.95*fade, 2);
+    glowMultilineText(p.sub, 0, pH/2+28, pW-20, '#8899aa', 8, 0.7*fade, 0);
 
     for(let pt=0;pt<4;pt++) {
       const ptt = ((t*0.35 + pt/4) % 1);
@@ -730,7 +757,7 @@ function drawFeedbackLoop(y1, y5) {
   ctx.save();
   ctx.translate(textX - 10, textY);
   ctx.rotate(-Math.PI/2 - 0.1); // Rotated to align nicely with typical scroll
-  glowText('feedback loop →', 0, 0, C.teal, 10, 0.4, 2);
+  glowMultilineText('epistemic feedback loop →', 0, 0, 150, C.teal, 10, 0.4, 2);
   ctx.restore();
 
   ctx.restore();
