@@ -14,3 +14,7 @@ __pycache__/
 htmlcov/
 .pytest_cache/
 coverage.xml
+
+# Ignore local AI prompts not relevant to project
+.github/copilot-instructions.md
+.github/prompts/

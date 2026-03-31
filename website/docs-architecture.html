@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Architecture Docs &mdash; Engram</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+</head>
+<body data-bg="#050505">
+  <!-- Ambient Background Elements -->
+  <div class="bg-grid"></div>
+
+  <!-- Navigation -->
+  <nav class="navbar scrolled" id="navbar">
+    <div class="container nav-content">
+      <a href="index.html" class="logo magnetic">
+        <div class="logo-icon">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="20" height="20" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+        </div>
+        <span>Engram <span style="font-size: 0.8rem; font-weight: 400; color: var(--text-secondary); margin-left: 0.5rem">Docs</span></span>
+      </a>
+      <ul class="nav-links">
+        <li><a class="magnetic-text" href="index.html">Back to Home</a></li>
+        <li>
+          <a href="https://github.com/bitphonix/Engram" class="btn btn-nav magnetic" target="_blank">
+            <span>GitHub Repo</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="container docs-layout">
+    <!-- Sidebar -->
+    <aside class="docs-sidebar">
+      <h3>Getting Started</h3>
+      <ul>
+        <li><a href="docs.html">Introduction</a></li>
+        <li><a href="docs.html#comparison">Engram vs Mem0</a></li>
+        <li><a href="docs.html#setup">Installation</a></li>
+      </ul>
+
+      <h3>Core Concepts</h3>
+      <ul>
+        <li><a href="docs-architecture.html" class="active">Architecture</a></li>
+        <li><a href="#graph-model">Temporal Graph</a></li>
+        <li><a href="#extraction">Extraction Pipeline</a></li>
+        <li><a href="#retrieval">4-Level Retrieval</a></li>
+        <li><a href="#weight-engine">Epistemic Engine</a></li>
+      </ul>
+
+      <h3>API & Integration</h3>
+      <ul>
+        <li><a href="docs-api.html">API Reference</a></li>
+        <li><a href="docs-api.html#mcp">MCP Server (Cursor/Claude)</a></li>
+      </ul>
+    </aside>
+
+    <!-- Content -->
+    <main class="docs-content">
+      <section id="architecture" class="docs-section">
+        <div class="badge-tag">Core Concept</div>
+        <h1>System Architecture</h1>
+        <p>Engram maps every decision you make in an AI interaction directly into a causal graph database. Rather than relying on fuzzy flat vector searches, Engram stores the relationship between your decisions, recording the "why" and explicitly tracking the alternatives you rejected over time.</p>
+        
+        <h2>Dual Database Persistence</h2>
+        <ul>
+          <li><strong>Neo4j:</strong> Stores the structural data mappings and edges. Nodes like Session, Decision, Counterfactual, and Outcome are explicitly linked using edges like <code>CAUSED_BY</code>, <code>SUPERSEDES</code>, and <code>CONTRADICTS</code>.</li>
+          <li><strong>ChromaDB:</strong> Allows for fuzzy semantic search. Used as "Level 1" memory to find entry points into the graph utilizing the <code>gemini-embedding-001</code> encoding format.</li>
+        </ul>
+      </section>
+
+      <section id="extraction" class="docs-section">
+        <h2>The Extraction Pipeline (LangGraph)</h2>
+        <p>When you pipe a conversation or an IDE captures your session via MCP, that text is run through a highly rigid extraction process to distill real knowledge, breaking down long chats into atomic graphs.</p>
+        
+        <ol>
+          <li><strong>Triage Node (Gemini Flash):</strong> Inspects the text to determine if it is "High Signal". Removes noise over syntax errors or trivial chat messages so it does not clutter the graph.</li>
+          <li><strong>Extractor Node (Gemini Pro):</strong> Pydantic structured output isolates decisions, finding specifically what alternative was considered and rejected, breaking compound paragraphs into multiple atomic <code>DecisionNode</code>s.</li>
+          <li><strong>Critique Node (Gemini Flash):</strong> Automatically validates the generated decisions for logic consistency. Loops back to extraction if it falls below a 7/10 score.</li>
+          <li><strong>Graph Writer:</strong> Interacts with Neo4j and ChromaDB, resolving context and wiring constraints.</li>
+        </ol>
+      </section>
+
+      <section id="retrieval" class="docs-section">
+        <h2>4-Level Retrieval</h2>
+        <p>This is what differentiates Engram from standard RAG applications. During an active <code>engram_context</code> request, we don't just dump flat summaries into the system prompt. Instead, we perform a 4-dimensional traverse to pull optimal context without overflowing the token budget:</p>
+
+        <h3>Level 1: Semantic Layer</h3>
+        <p>We query ChromaDB for similar decisions based on vector cosine-similarity strings to instantly identify matching root identifiers.</p>
+
+        <h3>Level 2: Causal Ancestry</h3>
+        <p>We take those matching identifiers and walk upstream inside the Neo4j graph using the <code>CAUSED_BY</code> edges. This answers: "What historical decisions directly led up to this outcome structure?"</p>
+
+        <h3>Level 3: Full Episode Context</h3>
+        <p>We expand the current node downwards to pull all the reasoning, the exact `rejection_concern` for every connected counterfactual, and subsequent outcomes recorded.</p>
+
+        <h3>Level 4: Counterfactual Surfaces</h3>
+        <p>We specifically query the Graph for active "Warnings". If an agent is considering a "High Scalability Database Architecture" context, Engram will proactively query Neo4j for previously disconnected Counterfactuals matching "Scalability". Finding past rejections helps prevent repeating mistakes across completely unrelated projects.</p>
+      </section>
+
+      <section id="weight-engine" class="docs-section">
+        <h2>The Epistemic Weight Engine</h2>
+        <p>Memory must slowly die unless proven right. Engram accomplishes this inherently using Epistemic Weighting.</p>
+        <p>Every node has a starting weight of <code>0.7</code> logic value.</p>
+        <ul>
+          <li><strong>Time Decay:</strong> A background process continuously drops the weight of a node over time, relative to its importance. (Architecture choices decay over months, bug fixes over days).</li>
+          <li><strong>Propagation Boost:</strong> If a past decision is successfully surfaced via Retrieval and utilized by the AI in code generation, it is artificially boosted closer to 1.0 logic value, solidifying the choice as bedrock engineering design.</li>
+          <li><strong>Override Signals:</strong> If Neo4j sees a new architectural node inserted in the exact same domain space as a previous one, it forcefully cuts the weight of the old node entirely effectively creating a <code>SUPERSEDES</code> edge.</li>
+        </ul>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container footer-content">
+      <div class="footer-brand">
+        <div class="logo">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="24" height="24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+          <span>Engram</span>
+        </div>
+        <p class="footer-desc">Intelligent causal memory for the modern AI toolchain.</p>
+      </div>
+      <div class="footer-links">
+        <div class="link-col">
+          <h4>Resources</h4>
+          <a href="docs.html" class="magnetic-text">Setup Guide</a>
+          <a href="docs-architecture.html" class="magnetic-text">Architecture Docs</a>
+          <a href="docs-api.html" class="magnetic-text">API Reference</a>
+        </div>
+        <div class="link-col">
+          <h4>Community</h4>
+          <a href="https://github.com/bitphonix/Engram" class="magnetic-text">GitHub</a>
+          <a href="#" class="magnetic-text">Discord</a>
+        </div>
+      </div>
+    </div>
+    <div class="container footer-bottom">
+      <p>&copy; 2026 Engram Project. MIT Licensed.</p>
+    </div>
+  </footer>
+
+</body>
+</html>

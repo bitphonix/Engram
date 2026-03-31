@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API & Integration Docs &mdash; Engram</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+</head>
+<body data-bg="#050505">
+  <!-- Ambient Background Elements -->
+  <div class="bg-grid"></div>
+
+  <!-- Navigation -->
+  <nav class="navbar scrolled" id="navbar">
+    <div class="container nav-content">
+      <a href="index.html" class="logo magnetic">
+        <div class="logo-icon">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="20" height="20" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+        </div>
+        <span>Engram <span style="font-size: 0.8rem; font-weight: 400; color: var(--text-secondary); margin-left: 0.5rem">Docs</span></span>
+      </a>
+      <ul class="nav-links">
+        <li><a class="magnetic-text" href="index.html">Back to Home</a></li>
+        <li>
+          <a href="https://github.com/bitphonix/Engram" class="btn btn-nav magnetic" target="_blank">
+            <span>GitHub Repo</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="container docs-layout">
+    <!-- Sidebar -->
+    <aside class="docs-sidebar">
+      <h3>Getting Started</h3>
+      <ul>
+        <li><a href="docs.html">Introduction</a></li>
+        <li><a href="docs.html#comparison">Engram vs Mem0</a></li>
+        <li><a href="docs.html#setup">Installation</a></li>
+      </ul>
+
+      <h3>Core Concepts</h3>
+      <ul>
+        <li><a href="docs-architecture.html">Architecture</a></li>
+        <li><a href="docs-architecture.html#graph-model">Temporal Graph</a></li>
+        <li><a href="docs-architecture.html#extraction">Extraction Pipeline</a></li>
+      </ul>
+
+      <h3>API & Integration</h3>
+      <ul>
+        <li><a href="docs-api.html" class="active">API Reference</a></li>
+        <li><a href="#mcp">MCP Server (Cursor/Claude)</a></li>
+        <li><a href="#rest">REST API</a></li>
+      </ul>
+    </aside>
+
+    <!-- Content -->
+    <main class="docs-content">
+      <section id="api" class="docs-section">
+        <div class="badge-tag">Integration</div>
+        <h1>API & Integrations</h1>
+        <p>Engram acts as a background knowledge plane for your everyday AI chat environments. You can talk to the background daemon through Model Context Protocol (MCP) or standard REST API calls.</p>
+      </section>
+
+      <section id="mcp" class="docs-section">
+        <h2>MCP Server Auto-Setup</h2>
+        <p>The fastest way to utilize Engram is hooking it directly into tools like Cursor, VS Code, or Claude Code. By injecting our Python MCP Server via standard `stdio` configurations, the agent gains four critical commands:</p>
+
+        <ul>
+          <li><strong>engram_capture</strong>: Placed at the end of sessions automatically so Claude can dump decisions before closing.</li>
+          <li><strong>engram_context</strong>: Run automatically at session initialization. Fetches the previous context based on the current workspace description.</li>
+          <li><strong>engram_warn</strong>: Claude is instructed specifically to fire this tool when creating a new architecture decision, verifying that you haven't rejected an identical component in the past.</li>
+          <li><strong>engram_stats</strong>: Diagnostics.</li>
+        </ul>
+
+        <h3>1-Command CLI Installation</h3>
+        <p>Instead of manually configuring JSON files, just type this into your terminal and the Engram CLI finds Cursor and Claude automatically:</p>
+        <div class="docs-code">
+engram install
+        </div>
+      </section>
+
+      <section id="rest" class="docs-section">
+        <h2>FastAPI REST Layer</h2>
+        <p>If you're building a custom client or integrating into an enterprise stack, Engram spins up a Uvicorn server locally on <code>localhost:8000</code>.</p>
+
+        <h3>Endpoint: /ingest</h3>
+        <p>Send session texts here for processing. Triggers the LangGraph extraction state machine returning structured results on success.</p>
+        <div class="docs-code">
+<span class="keyword">POST</span> /ingest
+<span class="comment">{
+  "content": "...",
+  "tool": "custom-ide",
+  "captured_via": "webhook",
+  "project_id": "api-gateway"
+}</span>
+        </div>
+
+        <h3>Endpoint: /context</h3>
+        <p>The 4-level traverse logic execution layer. You provide concerns and the target query, and Engram walks the graph and returns an optimally compressed injection string alongside counterfactual warnings.</p>
+        <div class="docs-code">
+<span class="keyword">POST</span> /context
+<span class="comment">{
+  "query": "choosing an auth system",
+  "domain": "security",
+  "concerns": ["scalability", "cost"]
+}</span>
+        </div>
+
+        <h3>Endpoint: /search</h3>
+        <p>For instantaneous, fast lookups skipping the heavy synthesis block. Useful if writing a raw debug terminal UI rendering direct Chroma vector results overlaid with Counterfactual triggers.</p>
+        <div class="docs-code">
+<span class="keyword">POST</span> /search
+<span class="comment">{
+  "query": "auth system",
+  "domain": "security"
+}</span>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container footer-content">
+      <div class="footer-brand">
+        <div class="logo">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="24" height="24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+          <span>Engram</span>
+        </div>
+        <p class="footer-desc">Intelligent causal memory for the modern AI toolchain.</p>
+      </div>
+      <div class="footer-links">
+        <div class="link-col">
+          <h4>Resources</h4>
+          <a href="docs.html" class="magnetic-text">Setup Guide</a>
+          <a href="docs-architecture.html" class="magnetic-text">Architecture Docs</a>
+          <a href="docs-api.html" class="magnetic-text">API Reference</a>
+        </div>
+        <div class="link-col">
+          <h4>Community</h4>
+          <a href="https://github.com/bitphonix/Engram" class="magnetic-text">GitHub</a>
+          <a href="#" class="magnetic-text">Discord</a>
+        </div>
+      </div>
+    </div>
+    <div class="container footer-bottom">
+      <p>&copy; 2026 Engram Project. MIT Licensed.</p>
+    </div>
+  </footer>
+
+</body>
+</html>

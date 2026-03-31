@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Documentation &mdash; Engram</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+</head>
+<body data-bg="#050505">
+  <!-- Ambient Background Elements -->
+  <div class="bg-grid"></div>
+
+  <!-- Navigation -->
+  <nav class="navbar scrolled" id="navbar">
+    <div class="container nav-content">
+      <a href="index.html" class="logo magnetic">
+        <div class="logo-icon">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="20" height="20" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+        </div>
+        <span>Engram <span style="font-size: 0.8rem; font-weight: 400; color: var(--text-secondary); margin-left: 0.5rem">Docs</span></span>
+      </a>
+      <ul class="nav-links">
+        <li><a class="magnetic-text" href="index.html">Back to Home</a></li>
+        <li>
+          <a href="https://github.com/bitphonix/Engram" class="btn btn-nav magnetic" target="_blank">
+            <span>GitHub Repo</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="container docs-layout">
+    <!-- Sidebar -->
+    <aside class="docs-sidebar">
+      <h3>Getting Started</h3>
+      <ul>
+        <li><a href="docs.html" class="active">Introduction</a></li>
+        <li><a href="docs.html#comparison">Engram vs Mem0</a></li>
+        <li><a href="docs.html#setup">Installation</a></li>
+      </ul>
+
+      <h3>Core Concepts</h3>
+      <ul>
+        <li><a href="docs-architecture.html">Architecture</a></li>
+        <li><a href="docs-architecture.html#graph-model">Temporal Graph</a></li>
+        <li><a href="docs-architecture.html#extraction">Extraction Pipeline</a></li>
+      </ul>
+
+      <h3>API & Integration</h3>
+      <ul>
+        <li><a href="docs-api.html">API Reference</a></li>
+        <li><a href="docs-api.html#mcp">MCP Server (Cursor/Claude)</a></li>
+      </ul>
+    </aside>
+
+    <!-- Content -->
+    <main class="docs-content">
+      <section id="introduction" class="docs-section">
+        <div class="badge-tag">Overview</div>
+        <h1>Getting Started with Engram</h1>
+        <p>Welcome to Engram's official documentation. Engram is a <strong>local-first causal knowledge graph</strong> designed specifically for developer decision intelligence.</p>
+        <p>Unlike generic conversational memory tools that simply store raw strings or vector chunks, Engram intercepts session events, parses the technical workflow via a multi-step LangGraph pipeline, and structurally graphs decisions, rejections, and context.</p>
+      </section>
+
+      <section id="comparison" class="docs-section">
+        <h2>Engram vs Mem0 / Claude Memory</h2>
+        <p>Why build another memory tool? The AI ecosystem is currently flooded with vector-based RAG memory tools. However, they fundamentally fail for deep engineering workflows.</p>
+
+        <h3>1. The "Counterfactual" Gap</h3>
+        <p>Standard memory tools (like Mem0) only store what you did. Engram specifically extracts and stores <strong>what you rejected and why</strong>. If you previously rejected MongoDB for latency issues, Engram surfaces that warning the next time you consider it.</p>
+
+        <h3>2. Temporal Evolution vs Flat Memory</h3>
+        <p>In most tools, memory gets stale fast. Engram features an active <strong>Epistemic Weighting Engine</strong> that runs locally in the background. It automatically decays older architectural choices, overwriting or establishing contradictions across projects as your decisions evolve.</p>
+
+        <h3>3. Causality, not just Similarity</h3>
+        <p>If you search for "database" in a traditional vector database, you get 10 text matches. Engram returns the full causal chain: "You chose PostgreSQL <em>because</em> of the previous auth refactor."</p>
+      </section>
+
+      <section id="setup" class="docs-section">
+        <h2>Quickstart Installation</h2>
+        <p>For the sake of privacy and data ownership, Engram runs completely independently on your local machine using Neo4j and local ChromaDB.</p>
+        
+        <h3>Prerequisites</h3>
+        <ul>
+          <li>Python 3.11 or higher.</li>
+          <li>Neo4j instance (AuraDB Free Tier or Local Desktop).</li>
+          <li>API key for Gemini (Gemini 1.5 Pro via API) or an equivalent LLM.</li>
+        </ul>
+
+        <h3>Installation</h3>
+        <p>Clone the repository and install the daemon.</p>
+        <div class="docs-code">
+<span class="comment"># 1. Clone the repository</span><br/>
+git clone https://github.com/bitphonix/Engram.git<br/>
+cd Engram<br/><br/>
+<span class="comment"># 2. Install the backend package and dependencies</span><br/>
+pip install -e .<br/><br/>
+<span class="comment"># 3. Setup basic configuration (.env)</span><br/>
+cp .env.example .env<br/><br/>
+<span class="comment"># 4. Start the background service</span><br/>
+engram start
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container footer-content">
+      <div class="footer-brand">
+        <div class="logo">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="24" height="24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+          <span>Engram</span>
+        </div>
+        <p class="footer-desc">Intelligent causal memory for the modern AI toolchain.</p>
+      </div>
+      <div class="footer-links">
+        <div class="link-col">
+          <h4>Resources</h4>
+          <a href="docs.html" class="magnetic-text">Setup Guide</a>
+          <a href="docs-architecture.html" class="magnetic-text">Architecture Docs</a>
+          <a href="docs-api.html" class="magnetic-text">API Reference</a>
+        </div>
+        <div class="link-col">
+          <h4>Community</h4>
+          <a href="https://github.com/bitphonix/Engram" class="magnetic-text">GitHub</a>
+          <a href="#" class="magnetic-text">Discord</a>
+        </div>
+      </div>
+    </div>
+    <div class="container footer-bottom">
+      <p>&copy; 2026 Engram Project. MIT Licensed.</p>
+    </div>
+  </footer>
+
+</body>
+</html>
