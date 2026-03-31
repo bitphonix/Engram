@@ -57,21 +57,6 @@ def on_startup():
         print(f"Warning: Neo4j constraint setup failed: {e}")
 
 
-FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
-
-if os.path.isdir(os.path.join(FRONTEND_DIR, "css")):
-    app.mount("/css", StaticFiles(directory=os.path.join(FRONTEND_DIR, "css")), name="css")
-if os.path.isdir(os.path.join(FRONTEND_DIR, "js")):
-    app.mount("/js", StaticFiles(directory=os.path.join(FRONTEND_DIR, "js")), name="js")
-if os.path.isdir(os.path.join(FRONTEND_DIR, "assets")):
-    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIR, "assets")), name="assets")
-
-@app.get("/")
-def serve_frontend():
-    index = os.path.join(FRONTEND_DIR, "index.html")
-    if os.path.exists(index):
-        return FileResponse(index)
-    return {"message": "Engram API running. Frontend not built yet."}
 
 
 class IngestRequest(BaseModel):
@@ -248,3 +233,15 @@ def get_context(req: ContextRequest):
     if retrieved_ids:
         boost_retrieved_decisions(retrieved_ids)
     return result
+
+# --- Static File Serving ---
+# Must be at the bottom so it doesn't shadow API routes.
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
+WEBSITE_DIR = os.path.join(BASE_DIR, "website")
+
+if os.path.isdir(FRONTEND_DIR):
+    app.mount("/app", StaticFiles(directory=FRONTEND_DIR, html=True), name="app_dashboard")
+
+if os.path.isdir(WEBSITE_DIR):
+    app.mount("/", StaticFiles(directory=WEBSITE_DIR, html=True), name="website")
