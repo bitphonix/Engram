@@ -236,6 +236,12 @@ def get_context(req: ContextRequest):
 
 # --- Static File Serving ---
 # Must be at the bottom so it doesn't shadow API routes.
+from fastapi.responses import RedirectResponse
+
+@app.get("/app", include_in_schema=False)
+def redirect_to_app():
+    return RedirectResponse(url="/app/")
+
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 WEBSITE_DIR = os.path.join(BASE_DIR, "website")
