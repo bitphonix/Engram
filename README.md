@@ -144,34 +144,84 @@ flowchart TD
 
 ### The knowledge graph (Neo4j)
 
-Three node types, five relationship types:
+Six node types, fourteen relationship types:
 
 ```mermaid
 erDiagram
     SESSION {
+        string id
         string tool
-        string project
-        datetime timestamp
-        string content_hash
+        string project_id
+        string raw_excerpt
+        datetime started_at
+        string captured_via
+    }
+    PROJECT {
+        string id
+        string name
+        string description
+        datetime created_at
     }
     DECISION {
+        string id
+        string summary
         string chosen
         string reasoning
+        string domain
         string situation_context
+        float confidence
         float epistemic_weight
+        float decay_rate
+        boolean is_invalidated
+        string tool
+        string project_id
+        string session_id
+        datetime created_at
+        datetime last_reinforced
     }
     COUNTERFACTUAL {
+        string id
         string rejected_option
         string rejection_reason
         string rejection_concern
+        string situation_context
+        float epistemic_weight
+        string decision_id
+        string session_id
+        datetime created_at
+    }
+    OUTCOME {
+        string id
+        string description
+        float quality_score
+        list signal_sources
+        string decision_id
+        datetime observed_at
+    }
+    CONCEPT {
+        string id
+        string name
+        string type
     }
 
-    SESSION ||--o{ DECISION : "contains"
-    DECISION ||--|{ COUNTERFACTUAL : "REJECTED_IN"
-    DECISION ||--o{ DECISION : "CAUSED_BY (builds on)"
-    DECISION ||--o{ DECISION : "SUPERSEDES (replaces)"
-    DECISION ||--o{ DECISION : "SIMILAR_TO (semantic match)"
-    DECISION ||--o{ DECISION : "CONTRADICTS (opposing choice)"
+    SESSION ||--o{ PROJECT : "BELONGS_TO"
+    SESSION ||--o{ DECISION : "PRODUCED"
+    
+    DECISION ||--o{ DECISION : "CAUSED_BY"
+    DECISION ||--o{ DECISION : "SUPERSEDES"
+    DECISION ||--o{ DECISION : "CONTRADICTS"
+    DECISION ||--o{ DECISION : "SIMILAR_TO"
+    
+    DECISION ||--|{ COUNTERFACTUAL : "REJECTED"
+    COUNTERFACTUAL ||--o{ COUNTERFACTUAL : "ALSO_REJECTED"
+    COUNTERFACTUAL ||--o{ DECISION : "CHOSEN_LATER"
+    
+    DECISION ||--o{ OUTCOME : "LED_TO"
+    OUTCOME ||--o{ DECISION : "REINFORCED"
+    OUTCOME ||--o{ DECISION : "INVALIDATED"
+    
+    DECISION ||--o{ CONCEPT : "INVOLVES"
+    COUNTERFACTUAL ||--o{ CONCEPT : "INVOLVES"
 ```
 
 ### 4-level causal retrieval
