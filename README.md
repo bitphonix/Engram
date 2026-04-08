@@ -204,22 +204,27 @@ erDiagram
         string type
     }
 
+    %% Organizational Hierarchy
     SESSION ||--o{ PROJECT : "BELONGS_TO"
     SESSION ||--o{ DECISION : "PRODUCED"
-    
+
+    %% Causal & Historical Chains
     DECISION ||--o{ DECISION : "CAUSED_BY"
     DECISION ||--o{ DECISION : "SUPERSEDES"
     DECISION ||--o{ DECISION : "CONTRADICTS"
     DECISION ||--o{ DECISION : "SIMILAR_TO"
-    
+
+    %% The Counterfactual Engine
     DECISION ||--|{ COUNTERFACTUAL : "REJECTED"
     COUNTERFACTUAL ||--o{ COUNTERFACTUAL : "ALSO_REJECTED"
     COUNTERFACTUAL ||--o{ DECISION : "CHOSEN_LATER"
-    
+
+    %% Evolutionary Feedback Loop
     DECISION ||--o{ OUTCOME : "LED_TO"
-    OUTCOME ||--o{ DECISION : "REINFORCED"
-    OUTCOME ||--o{ DECISION : "INVALIDATED"
-    
+    OUTCOME ||--o{ DECISION : "REINFORCED (Success)"
+    OUTCOME ||--o{ DECISION : "INVALIDATED (Failure)"
+
+    %% Taxonomy & Domain Linking
     DECISION ||--o{ CONCEPT : "INVOLVES"
     COUNTERFACTUAL ||--o{ CONCEPT : "INVOLVES"
 ```
